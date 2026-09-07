@@ -1,37 +1,37 @@
 # Life OS
 
-Life OS is a comprehensive personal management and tracking application built with React, Vite, Tailwind CSS, and Firebase. This project is currently live and actively being used.
+Life OS; React, Vite, Tailwind CSS ve Firebase kullanılarak geliştirilmiş kapsamlı bir kişisel yönetim ve takip uygulamasıdır. Bu proje şu anda yayındadır ve aktif olarak kullanılmaktadır.
 
-## Features
+## Özellikler
 
-- **Personal Dashboard:** Manage various aspects of your daily life in one place.
-- **AI Assistant (`AiAsistan`):** Get intelligent insights and help with your daily tasks.
-- **Exam Tracker (`SinavTakibi`):** Keep track of upcoming exams, study schedules, and results.
-- **Skin Care Tracker (`CiltBakimi`):** Monitor your skincare routine and product usage.
-- **Cycle Tracker (`DonguTakibi`):** Personal health and cycle tracking.
+- **Kişisel Kontrol Paneli:** Günlük yaşantınızın çeşitli yönlerini tek bir yerden yönetin.
+- **Yapay Zeka Asistanı (`AiAsistan`):** Akıllı tavsiyeler alın ve günlük görevlerinizde yardım görün.
+- **Sınav Takibi (`SinavTakibi`):** Yaklaşan sınavları, ders çalışma programlarını ve sonuçları takip edin.
+- **Cilt Bakımı Takibi (`CiltBakimi`):** Cilt bakım rutininizi ve kullandığınız ürünleri izleyin.
+- **Döngü Takibi (`DonguTakibi`):** Kişisel sağlık ve döngü takibi yapın.
 
-## Tech Stack
+## Kullanılan Teknolojiler
 
-- **Frontend Framework:** React 19 + Vite
-- **Styling:** Tailwind CSS
-- **Backend & Database:** Firebase (Firestore)
-- **Data Visualization:** Recharts
-- **Interactive UI:** Canvas Confetti
+- **Önyüz (Frontend) Çerçevesi:** React 19 + Vite
+- **Stillendirme:** Tailwind CSS
+- **Arkayüz (Backend) & Veritabanı:** Firebase (Firestore)
+- **Veri Görselleştirme:** Recharts
+- **Etkileşimli Arayüz:** Canvas Confetti
 
-## Getting Started
+## Başlarken
 
-To run this project locally:
+Bu projeyi yerel ortamınızda çalıştırmak için:
 
-1. Clone the repository
-2. Install dependencies:
+1. Depoyu klonlayın
+2. Bağımlılıkları yükleyin:
    ```bash
    npm install
    ```
-3. Start the development server:
+3. Geliştirme sunucusunu başlatın:
    ```bash
    npm run dev
    ```
 
-## Live Project
+## Canlı Proje
 
-This project is currently deployed and running in a live environment.
+Bu proje şu anda yayına alınmıştır ve canlı ortamda çalışmaktadır.
