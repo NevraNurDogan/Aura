@@ -23,6 +23,9 @@ export default function Profil() {
 
   const [haftalikVeri, setHaftalikVeri] = useState([]);
   const [enerjiVerisi, setEnerjiVerisi] = useState([]);
+  const [isiHaritasiVerisi, setIsiHaritasiVerisi] = useState([]);
+  
+  const [ozetModalAcik, setOzetModalAcik] = useState(false);
 
   const tumRozetler = [
     // Alışkanlık Serileri
@@ -146,7 +149,8 @@ export default function Profil() {
         avatarUrl: localStorage.getItem('lifeos_profil_avatar') || '',
         xp: parseInt(localStorage.getItem('lifeos_profil_xp') || '0'),
         level: parseInt(localStorage.getItem('lifeos_profil_level') || '1'),
-        kazanilanRozetler: localStorage.getItem('lifeos_profil_rozetler') || ''
+        kazanilanRozetler: localStorage.getItem('lifeos_profil_rozetler') || '',
+        email: auth.currentUser?.email || ''
       };
     }
 
@@ -180,6 +184,19 @@ export default function Profil() {
       gercekEnerjiVerisi.push({ gun: `${4-w}. Hafta`, enerji: (haftalikPuan || 2) * 5 });
     }
     setEnerjiVerisi(gercekEnerjiVerisi);
+
+    // ISI HARİTASI (Son 140 Gün / 20 Hafta)
+    const gercekIsiHaritasi = [];
+    for (let d = 139; d >= 0; d--) {
+      const gDate = new Date();
+      gDate.setDate(gDate.getDate() - d);
+      const str = getLocalDateStr(gDate);
+      
+      const aCount = aliskanlikData.filter(a => (a.tamamlananTarihler || '').includes(str)).length;
+      const gCount = gorevData.filter(g => g.tarih === str && g.bitti).length;
+      gercekIsiHaritasi.push({ tarih: str, count: aCount + gCount });
+    }
+    setIsiHaritasiVerisi(gercekIsiHaritasi);
 
     // KAPSAMLI HASSAS XP VE ROZET HESAPLAMA MOTORU
     let enYuksekSeri = 0;
@@ -400,8 +417,14 @@ export default function Profil() {
             <p className="text-[9px] text-gray-400 mt-1.5 text-right font-medium">Her {seviyeBasiXp} XP'de seviye atlarsın.</p>
           </div>
           
-          {/* ÇIKIŞ YAP BUTONU */}
-          <div className="w-full max-w-md mx-auto md:mx-0 mt-6 flex justify-end">
+          {/* ÇIKIŞ YAP VE RAPOR BUTONLARI */}
+          <div className="w-full max-w-md mx-auto md:mx-0 mt-6 flex justify-end gap-3">
+            <button 
+              onClick={() => setOzetModalAcik(true)}
+              className="px-5 py-2.5 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-xl text-xs font-bold transition-transform hover:scale-105 shadow-sm cursor-pointer border border-transparent"
+            >
+              ✨ Haftalık Özeti Gör
+            </button>
             <button 
               onClick={() => signOut(auth)}
               className="px-5 py-2.5 bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700 rounded-xl text-xs font-bold transition-colors cursor-pointer border border-red-100"
@@ -506,10 +529,96 @@ export default function Profil() {
                 </LineChart>
               </ResponsiveContainer>
             </div>
+            
+            <div className="mt-8 pt-6 border-t border-black/5">
+              <h3 className="text-xl font-serif text-gray-900 mb-1 font-normal">Isı Haritası</h3>
+              <p className="text-xs text-gray-400 mb-4 font-light">Son 140 gündeki faaliyet yoğunluğunuz.</p>
+              
+              <div className="w-full overflow-x-auto custom-scrollbar pb-3">
+                <div className="flex gap-1" style={{ width: 'max-content' }}>
+                  {Array.from({ length: 20 }).map((_, colIdx) => (
+                    <div key={colIdx} className="flex flex-col gap-1">
+                      {Array.from({ length: 7 }).map((_, rowIdx) => {
+                        const dayIndex = colIdx * 7 + rowIdx;
+                        if (dayIndex >= isiHaritasiVerisi.length) return null;
+                        const veri = isiHaritasiVerisi[dayIndex];
+                        const seviye = veri.count === 0 ? 'bg-gray-100' : veri.count <= 2 ? 'bg-emerald-200' : veri.count <= 5 ? 'bg-emerald-400' : 'bg-emerald-600';
+                        return (
+                          <div 
+                            key={dayIndex} 
+                            className={`w-3 h-3 sm:w-4 sm:h-4 rounded-sm ${seviye} transition-all hover:scale-125 cursor-help shadow-xs`} 
+                            title={`${veri.tarih}: ${veri.count} Görev/Alışkanlık`} 
+                          />
+                        );
+                      })}
+                    </div>
+                  ))}
+                </div>
+                <div className="flex items-center justify-end gap-2 mt-2 text-[10px] text-gray-500 font-medium">
+                  <span>Daha az</span>
+                  <div className="flex gap-1">
+                    <div className="w-3 h-3 rounded-sm bg-gray-100"></div>
+                    <div className="w-3 h-3 rounded-sm bg-emerald-200"></div>
+                    <div className="w-3 h-3 rounded-sm bg-emerald-400"></div>
+                    <div className="w-3 h-3 rounded-sm bg-emerald-600"></div>
+                  </div>
+                  <span>Daha fazla</span>
+                </div>
+              </div>
+            </div>
+            
           </div>
 
         </div>
       </div>
+
+      {/* HAFTALIK ÖZET (SPOTIFY WRAPPED) MODALI */}
+      {ozetModalAcik && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-gradient-to-br from-indigo-900 via-purple-900 to-black w-full max-w-sm rounded-[2.5rem] shadow-2xl border border-white/10 overflow-hidden relative">
+            <button 
+              onClick={() => setOzetModalAcik(false)}
+              className="absolute top-5 right-5 w-8 h-8 flex items-center justify-center bg-white/10 hover:bg-white/20 text-white rounded-full transition z-10 cursor-pointer"
+            >
+              ✕
+            </button>
+            
+            <div className="p-8 pb-12 flex flex-col items-center text-center relative z-0">
+              <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-20 pointer-events-none"></div>
+              
+              <h2 className="text-3xl font-serif text-white font-bold mb-2">Aura Özetin</h2>
+              <p className="text-sm text-purple-200 font-light mb-8">Senin için geride bıraktığın haftanın kısa bir hikayesi.</p>
+              
+              <div className="space-y-4 w-full">
+                <div className="bg-white/10 backdrop-blur-md rounded-2xl p-5 border border-white/5 transform transition hover:scale-105">
+                  <span className="text-4xl block mb-2">🎯</span>
+                  <h3 className="text-2xl font-bold text-white">{(haftalikVeri.reduce((a, b) => a + b.gorev, 0))} Görev</h3>
+                  <p className="text-xs text-purple-200 mt-1">Bu hafta başarıyla tamamladın.</p>
+                </div>
+                
+                <div className="bg-white/10 backdrop-blur-md rounded-2xl p-5 border border-white/5 transform transition hover:scale-105">
+                  <span className="text-4xl block mb-2">⚡</span>
+                  <h3 className="text-2xl font-bold text-white">{(haftalikVeri.reduce((a, b) => a + b.aliskanlik, 0))} Kez</h3>
+                  <p className="text-xs text-purple-200 mt-1">Alışkanlık zincirini kırmadın.</p>
+                </div>
+                
+                <div className="bg-white/10 backdrop-blur-md rounded-2xl p-5 border border-white/5 transform transition hover:scale-105">
+                  <span className="text-4xl block mb-2">🌟</span>
+                  <h3 className="text-xl font-bold text-white">{haftalikVeri.reduce((a, b) => a + b.gorev, 0) > 10 ? 'Mükemmel Bir Hafta!' : 'İstikrarlı Adımlar'}</h3>
+                  <p className="text-xs text-purple-200 mt-1">Sanal ağacını büyütmeye devam et!</p>
+                </div>
+              </div>
+              
+              <button 
+                onClick={() => setOzetModalAcik(false)}
+                className="mt-8 bg-white text-indigo-900 px-6 py-2.5 rounded-full text-sm font-bold hover:bg-gray-100 transition cursor-pointer"
+              >
+                Harika!
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

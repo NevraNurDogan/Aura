@@ -61,12 +61,16 @@ input::placeholder, textarea::placeholder {
   border-color: rgba(255, 255, 255, 0.08) !important;
 }
 
-/* Yarı saydam kartlar */
+/* Yarı saydam kartlar (Cam efekti) */
 [data-mod="koyu"] [class*="bg-white/40"],
 [data-mod="koyu"] [class*="bg-white\/40"],
+[data-mod="koyu"] [class*="bg-white/60"],
+[data-mod="koyu"] [class*="bg-white\/60"],
+[data-mod="koyu"] [class*="bg-white/80"],
+[data-mod="koyu"] [class*="bg-white\/80"],
 [data-mod="koyu"] .modul-kart-normal {
-  background-color: rgba(20, 20, 20, 0.8) !important;
-  border-color: rgba(255, 255, 255, 0.05) !important;
+  background-color: rgba(20, 20, 20, 0.85) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
 }
 [data-mod="koyu"] .modul-kart-secili {
   background-color: #1a1a1a !important;
@@ -327,4 +331,23 @@ select.maneviyat-hero-select option {
 /* Progress bar bg */
 [data-mod="koyu"] .progress-bg {
   background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* --- PAGE SWIPE ANIMATIONS --- */
+@keyframes swipeInLeft {
+  0% { transform: translateX(40px); opacity: 0; }
+  100% { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes swipeInRight {
+  0% { transform: translateX(-40px); opacity: 0; }
+  100% { transform: translateX(0); opacity: 1; }
+}
+
+.animate-page-turn-left {
+  animation: swipeInLeft 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+
+.animate-page-turn-right {
+  animation: swipeInRight 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
 }

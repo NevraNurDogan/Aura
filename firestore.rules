@@ -12,14 +12,22 @@ service cloud.firestore {
       );
     }
 
-    // Profiles use the UID as the document ID, so we check the ID instead of a field
+    // Profiles can be read by any authenticated user for search/friends list
     match /profiles/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read: if request.auth != null;
+      allow update: if request.auth != null && (request.auth.uid == userId || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['friends']));
+      allow create, delete: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Friend Requests
+    match /friend_requests/{document=**} {
+      allow read, write: if request.auth != null;
     }
     
     // All other collections use the userId field to determine ownership
     match /habits/{document=**} { allow read, write: if isOwner(); }
     match /tasks/{document=**} { allow read, write: if isOwner(); }
+    match /dailyTasks/{document=**} { allow read, write: if isOwner(); }
     match /skincare/{document=**} { allow read, write: if isOwner(); }
     match /media_archive/{document=**} { allow read, write: if isOwner(); }
     match /cycles/{document=**} { allow read, write: if isOwner(); }

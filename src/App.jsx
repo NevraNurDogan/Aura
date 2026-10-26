@@ -1,8 +1,10 @@
 import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { auth, googleProvider } from './firebase';
-import { signInWithPopup, sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink, onAuthStateChanged } from 'firebase/auth';
-
+import { signInWithPopup, signInWithCredential, GoogleAuthProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged } from 'firebase/auth';
+import { Capacitor } from '@capacitor/core';
+import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
 const AnaSayfa = lazy(() => import('./components/AnaSayfa'));
+const Ajanda = lazy(() => import('./components/Ajanda'));
 const GunlukDuzen = lazy(() => import('./components/GunlukDuzen'));
 const CiltBakimi = lazy(() => import('./components/CiltBakimi'));
 const IzlemeOkuma = lazy(() => import('./components/IzlemeArsivi'));
@@ -10,13 +12,20 @@ const SinavGorevleri = lazy(() => import('./components/SinavTakibi'));
 const Dongu = lazy(() => import('./components/DonguTakibi'));
 const Maneviyat = lazy(() => import('./components/Maneviyat'));
 const Profil = lazy(() => import('./components/Profil'));
+const Istatistikler = lazy(() => import('./components/Istatistikler'));
 const Takvim = lazy(() => import('./components/Takvim'));
 const Ayarlar = lazy(() => import('./components/Ayarlar'));
 const AiAsistan = lazy(() => import('./components/AiAsistan'));
+const Sosyal = lazy(() => import('./components/Sosyal'));
 
 const YukeIkonu = () => (
-  <div className="flex-1 flex items-center justify-center min-h-[50vh]">
-    <div className="w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
+  <div className="flex flex-col gap-6 p-2 md:p-6 animate-pulse w-full max-w-5xl mx-auto opacity-60">
+    <div className="h-40 md:h-48 bg-gray-200 rounded-[2.5rem] w-full"></div>
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="h-64 bg-gray-200 rounded-[2.5rem]"></div>
+      <div className="h-64 bg-gray-200 rounded-[2.5rem]"></div>
+      <div className="h-64 bg-gray-200 rounded-[2.5rem]"></div>
+    </div>
   </div>
 );
 
@@ -82,6 +91,7 @@ const TANITIM_ADIMLARI = [
 
 /* ─── Modül Listesi ─────────────────────────────────────────── */
 const MODULLER = {
+  ajanda:    { icon: '▤', ad: 'Ajanda',            aciklama: 'Günlük planların ve geçmiş kayıtların',               iconBg: 'bg-purple-50',  iconRenk: 'text-purple-500' },
   gunluk:    { icon: '❖', ad: 'Günlük Düzen',      aciklama: 'Alışkanlıklarını takip et, zincirini kırma',          iconBg: 'bg-orange-50',  iconRenk: 'text-orange-500' },
   cilt:      { icon: '✦', ad: 'Cilt Bakımı',        aciklama: 'Kişisel bakım rutinini planla ve izle',               iconBg: 'bg-red-50',     iconRenk: 'text-rose-400' },
   izleme:    { icon: '◈', ad: 'İzleme Arşivi',      aciklama: 'İzleme listenizi yönet ve arşivle',                   iconBg: 'bg-blue-50',    iconRenk: 'text-blue-500' },
@@ -95,11 +105,16 @@ const MODULLER = {
 ═══════════════════════════════════════════════════════════════ */
 function GirisEkrani({ onDevam }) {
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [mesaj, setMesaj] = useState('');
   const [deferredPrompt, setDeferredPrompt] = useState(null);
 
   useEffect(() => {
+    if (Capacitor.isNativePlatform()) {
+      GoogleAuth.initialize();
+    }
     const handler = (e) => {
       e.preventDefault();
       setDeferredPrompt(e);
@@ -123,28 +138,37 @@ function GirisEkrani({ onDevam }) {
   const handleGoogle = async () => {
     try {
       setLoading(true);
-      await signInWithPopup(auth, googleProvider);
+      if (Capacitor.isNativePlatform()) {
+        const response = await GoogleAuth.signIn();
+        const credential = GoogleAuthProvider.credential(response.authentication.idToken);
+        await signInWithCredential(auth, credential);
+      } else {
+        await signInWithPopup(auth, googleProvider);
+      }
     } catch (error) {
       console.error(error);
-      setMesaj('Google girişi başarısız oldu.');
+      const errDetail = error.message || JSON.stringify(error) || 'Bilinmeyen hata';
+      setMesaj(`Google Hata Kodu: ${errDetail}`);
       setLoading(false);
     }
   };
 
-  const handleEmailLink = async (e) => {
+  const handleEmailAuth = async (e) => {
     e.preventDefault();
-    if (!email) return;
+    if (!email || !password) return;
     try {
       setLoading(true);
-      await sendSignInLinkToEmail(auth, email, {
-        url: window.location.origin,
-        handleCodeInApp: true,
-      });
-      window.localStorage.setItem('emailForSignIn', email);
-      setMesaj('Giriş bağlantısı e-posta adresinize gönderildi! Lütfen e-postanızı kontrol edin.');
+      if (isLogin) {
+        await signInWithEmailAndPassword(auth, email, password);
+      } else {
+        await createUserWithEmailAndPassword(auth, email, password);
+      }
     } catch (error) {
       console.error(error);
-      setMesaj('Hata oluştu. Tekrar deneyin.');
+      if (error.code === 'auth/email-already-in-use') setMesaj('Bu e-posta adresi zaten kullanılıyor.');
+      else if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') setMesaj('E-posta veya şifre hatalı.');
+      else if (error.code === 'auth/weak-password') setMesaj('Şifre çok zayıf (en az 6 karakter).');
+      else setMesaj('Hata oluştu. Tekrar deneyin.');
     } finally {
       setLoading(false);
     }
@@ -177,7 +201,7 @@ function GirisEkrani({ onDevam }) {
             <div className="h-px bg-gray-200 flex-1"></div>
           </div>
 
-          <form onSubmit={handleEmailLink} className="space-y-4">
+          <form onSubmit={handleEmailAuth} className="space-y-4">
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-2 uppercase tracking-wider">
                 E-Posta Adresiniz
@@ -191,20 +215,42 @@ function GirisEkrani({ onDevam }) {
                 className="w-full px-4 py-3 rounded-2xl border border-gray-200 bg-gray-50 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-transparent transition"
               />
             </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-2 uppercase tracking-wider">
+                Şifre
+              </label>
+              <input
+                type="password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                placeholder="••••••••"
+                required
+                minLength="6"
+                className="w-full px-4 py-3 rounded-2xl border border-gray-200 bg-gray-50 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-transparent transition"
+              />
+            </div>
             
             <button
               type="submit"
-              disabled={loading || !email}
+              disabled={loading || !email || !password}
               className={`w-full py-3.5 rounded-2xl font-semibold text-sm transition-all cursor-pointer ${
-                email && !loading
+                email && password && !loading
                   ? 'bg-gray-900 text-white hover:bg-black hover:scale-[1.02] active:scale-[0.98] shadow-md'
                   : 'bg-gray-100 text-gray-300 cursor-not-allowed'
               }`}
             >
-              {loading ? 'Bekleniyor...' : 'Giriş Bağlantısı Gönder'}
+              {loading ? 'Bekleniyor...' : (isLogin ? 'Giriş Yap' : 'Kayıt Ol')}
             </button>
           </form>
           {mesaj && <p className="text-xs text-center text-indigo-600 font-medium leading-relaxed">{mesaj}</p>}
+          
+          <button
+            type="button"
+            onClick={() => setIsLogin(!isLogin)}
+            className="w-full text-center text-xs text-gray-500 hover:text-indigo-600 cursor-pointer"
+          >
+            {isLogin ? 'Hesabın yok mu? Kayıt Ol' : 'Zaten hesabın var mı? Giriş Yap'}
+          </button>
         </div>
 
         <button 
@@ -371,18 +417,6 @@ function App() {
   const [authChecked, setAuthChecked] = useState(false);
 
   useEffect(() => {
-    if (isSignInWithEmailLink(auth, window.location.href)) {
-      let email = window.localStorage.getItem('emailForSignIn');
-      if (!email) {
-        email = window.prompt('Lütfen onay için e-posta adresinizi tekrar girin:');
-      }
-      signInWithEmailLink(auth, email, window.location.href)
-        .then(() => {
-          window.localStorage.removeItem('emailForSignIn');
-        })
-        .catch(console.error);
-    }
-
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
         localStorage.setItem('lifeos_kullanici', user.uid);
@@ -447,6 +481,7 @@ function App() {
 
   const sayfaBasliklari = {
     anasayfa: 'Ana Sayfa',
+    ajanda: 'Ajanda',
     takvim: 'Takvim & Etkinlikler',
     gunluk: 'Günlük Düzen',
     cilt: 'Cilt Bakımı',
@@ -456,6 +491,7 @@ function App() {
     profil: 'Profil',
     ayarlar: 'Ayarlar & Görünüm',
     maneviyat: 'Maneviyat & Huzur',
+    sosyal: 'Aura Topluluğu',
   };
 
   const sayfaIkonlari = {
@@ -466,6 +502,7 @@ function App() {
     sinav: '◎',
     dongu: '○',
     maneviyat: '☽',
+    sosyal: '👥',
   };
 
   if (!authChecked) {
@@ -556,6 +593,12 @@ function App() {
             <span className="text-lg">⊞</span> Ana Sayfa
           </button>
 
+          {seciliModuller.ajanda && (
+            <button onClick={() => sayfaDegistir('ajanda')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-left text-sm transition-all cursor-pointer ${aktifSayfa === 'ajanda' ? 'bg-white text-gray-900 font-semibold shadow-sm shadow-black/5 border border-black/5' : 'text-gray-500 hover:bg-black/5 hover:text-gray-800 font-normal'}`}>
+              <span className="text-lg">▤</span> Ajanda
+            </button>
+          )}
+
           <button onClick={() => sayfaDegistir('takvim')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-left text-sm transition-all cursor-pointer ${aktifSayfa === 'takvim' ? 'bg-white text-gray-900 font-semibold shadow-sm shadow-black/5 border border-black/5' : 'text-gray-500 hover:bg-black/5 hover:text-gray-800 font-normal'}`}>
             <span className="text-lg">◫</span> Takvim
           </button>
@@ -597,8 +640,14 @@ function App() {
           )}
 
           <div className="pt-4 mt-4 border-t border-black/5">
-            <button onClick={() => sayfaDegistir('ayarlar')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-left text-sm transition-all cursor-pointer ${aktifSayfa === 'ayarlar' ? 'bg-white text-gray-900 font-semibold shadow-sm shadow-black/5 border border-black/5' : 'text-gray-500 hover:bg-black/5 hover:text-gray-800 font-normal'}`}>
-              <span className="text-lg">⚙️</span> Ayarlar
+            <button onClick={() => sayfaDegistir('istatistikler')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-left text-sm transition-all cursor-pointer ${aktifSayfa === 'istatistikler' ? 'bg-white text-gray-900 font-semibold shadow-sm shadow-black/5 border border-black/5' : 'text-gray-500 hover:bg-black/5 hover:text-gray-800 font-normal'}`}>
+              <span className="text-lg">📊</span> İstatistikler
+            </button>
+            <button onClick={() => sayfaDegistir('sosyal')} className={`w-full flex items-center gap-3 px-4 py-3 mt-1 rounded-2xl text-left text-sm transition-all cursor-pointer ${aktifSayfa === 'sosyal' ? 'bg-white text-gray-900 font-semibold shadow-sm shadow-black/5 border border-black/5' : 'text-gray-500 hover:bg-black/5 hover:text-gray-800 font-normal'}`}>
+              <span className="text-lg">⚯</span> Sosyal & Odalar
+            </button>
+            <button onClick={() => sayfaDegistir('ayarlar')} className={`w-full flex items-center gap-3 px-4 py-3 mt-1 rounded-2xl text-left text-sm transition-all cursor-pointer ${aktifSayfa === 'ayarlar' ? 'bg-white text-gray-900 font-semibold shadow-sm shadow-black/5 border border-black/5' : 'text-gray-500 hover:bg-black/5 hover:text-gray-800 font-normal'}`}>
+              <span className="text-lg">⎔</span> Ayarlar
             </button>
           </div>
         </nav>
@@ -607,14 +656,17 @@ function App() {
       <main className="flex-1 lg:ml-64 p-4 sm:p-6 md:p-10 lg:p-14 overflow-y-auto min-h-screen">
         <Suspense fallback={<YukeIkonu />}>
           {aktifSayfa === 'anasayfa' && <AnaSayfa seciliModuller={seciliModuller} setAktifSayfa={sayfaDegistir} />}
+          {aktifSayfa === 'ajanda'   && <Ajanda />}
           {aktifSayfa === 'takvim'   && <Takvim setAktifSayfa={sayfaDegistir} />}
           {aktifSayfa === 'gunluk'    && <GunlukDuzen />}
           {aktifSayfa === 'cilt'     && <CiltBakimi />}
           {aktifSayfa === 'izleme'   && <IzlemeOkuma />}
           {aktifSayfa === 'sinav'    && <SinavGorevleri />}
           {aktifSayfa === 'dongu'    && <Dongu />}
-          {aktifSayfa === 'profil'   && <Profil />}
+          {aktifSayfa === 'profil' && <Profil setAktifSayfa={sayfaDegistir} />}
           {aktifSayfa === 'maneviyat' && <Maneviyat />}
+          {aktifSayfa === 'istatistikler' && <Istatistikler />}
+          {aktifSayfa === 'sosyal' && <Sosyal />}
         </Suspense>
 
         {aktifSayfa === 'ayarlar' && (

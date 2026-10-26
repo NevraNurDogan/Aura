@@ -1,0 +1,12 @@
+{
+  "appId": "com.nevranur.lifeos",
+  "appName": "Aura",
+  "webDir": "dist",
+  "plugins": {
+    "GoogleAuth": {
+      "scopes": ["profile", "email"],
+      "serverClientId": "1071239396934-tsjg69pqhmtc7oje5kigf9f1k8nqbi4b.apps.googleusercontent.com",
+      "forceCodeForRefreshToken": true
+    }
+  }
+}

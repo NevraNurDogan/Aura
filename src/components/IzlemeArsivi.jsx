@@ -12,6 +12,7 @@ export default function IzlemeArsivi() {
   const [formGoster, setFormGoster] = useState(false);
   const [otomatikAramaYukleniyor, setOtomatikAramaYukleniyor] = useState(false);
   const [aramaSonucuMesaj, setAramaSonucuMesaj] = useState('');
+  const [aramaSecenekleri, setAramaSecenekleri] = useState([]);
   
   // DÜZENLEME MODU İÇİN YENİ STATE
   const [duzenlenenId, setDuzenlenenId] = useState(null);
@@ -27,39 +28,52 @@ export default function IzlemeArsivi() {
   });
 
   // ÇOKLU API KAPSAMLI KAPAK VE BİLGİ BULMA MOTORU
-  const detaylariVeGorseliOtomatikBul = async (baslik, tur) => {
-    if (!baslik.trim()) return null;
-
-    let gorselUrl = '';
-    let yazarVeyaYonetmen = '';
-    let kategori = '';
+  const cokluSonucGetir = async (baslik, tur) => {
+    if (!baslik.trim()) return [];
+    let sonuclar = [];
 
     if (tur === 'Kitap') {
       try {
-        const gRes = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(baslik)}&printType=books&maxResults=3`);
+        const gRes = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(baslik)}&printType=books&maxResults=5`);
         if (gRes.ok) {
           const gData = await gRes.json();
           if (gData.items && gData.items.length > 0) {
-            const info = gData.items[0].volumeInfo;
-            if (info.authors && info.authors.length > 0) yazarVeyaYonetmen = info.authors.join(', ');
-            if (info.categories && info.categories.length > 0) kategori = info.categories.join(' / ');
-            if (info.imageLinks) {
-              const rawImg = info.imageLinks.thumbnail || info.imageLinks.smallThumbnail || info.imageLinks.medium || '';
-              gorselUrl = rawImg.replace('http:', 'https:').replace('&edge=curl', '');
-            }
+            gData.items.forEach(item => {
+              const info = item.volumeInfo;
+              let yazar = info.authors ? info.authors.join(', ') : '';
+              let kat = info.categories ? info.categories.join(' / ') : '';
+              let resim = '';
+              if (info.imageLinks) {
+                resim = (info.imageLinks.thumbnail || info.imageLinks.smallThumbnail || '').replace('http:', 'https:').replace('&edge=curl', '');
+              }
+              sonuclar.push({
+                baslik: info.title || baslik,
+                gorselUrl: resim,
+                kategoriDetay: (yazar && kat) ? `${yazar} • ${kat}` : (yazar || kat || ''),
+                yil: info.publishedDate ? info.publishedDate.substring(0,4) : ''
+              });
+            });
           }
         }
       } catch (e) { console.warn("Google Books API hatası:", e); }
 
-      if (!gorselUrl || !yazarVeyaYonetmen) {
+      // Google Books fail olursa veya az sonuç verirse OpenLibrary ile destekle
+      if (sonuclar.length < 3) {
         try {
-          const olRes = await fetch(`https://openlibrary.org/search.json?title=${encodeURIComponent(baslik)}&limit=1`);
+          const olRes = await fetch(`https://openlibrary.org/search.json?title=${encodeURIComponent(baslik)}&limit=5`);
           if (olRes.ok) {
             const olData = await olRes.json();
             if (olData.docs && olData.docs.length > 0) {
-              const doc = olData.docs[0];
-              if (!yazarVeyaYonetmen && doc.author_name) yazarVeyaYonetmen = doc.author_name.slice(0, 2).join(', ');
-              if (!gorselUrl && doc.cover_i) gorselUrl = `https://covers.openlibrary.org/b/id/${doc.cover_i}-L.jpg`;
+              olData.docs.forEach(doc => {
+                let yazar = doc.author_name ? doc.author_name.slice(0, 2).join(', ') : '';
+                let resim = doc.cover_i ? `https://covers.openlibrary.org/b/id/${doc.cover_i}-L.jpg` : '';
+                sonuclar.push({
+                  baslik: doc.title || baslik,
+                  gorselUrl: resim,
+                  kategoriDetay: yazar,
+                  yil: doc.first_publish_year ? String(doc.first_publish_year) : ''
+                });
+              });
             }
           }
         } catch (e) { console.warn("Open Library hatası:", e); }
@@ -67,55 +81,106 @@ export default function IzlemeArsivi() {
     }
 
     if (tur === 'Dizi') {
+      // 1. Önce TMDB (Türkçe diziler için en iyisi)
       try {
-        const tvRes = await fetch(`https://api.tvmaze.com/singlesearch/shows?q=${encodeURIComponent(baslik)}`);
-        if (tvRes.ok) {
-          const tvData = await tvRes.json();
-          if (tvData.genres && tvData.genres.length > 0) kategori = tvData.genres.join(' / ');
-          if (tvData.network && tvData.network.name) yazarVeyaYonetmen = tvData.network.name;
-          else if (tvData.webChannel && tvData.webChannel.name) yazarVeyaYonetmen = tvData.webChannel.name;
-          
-          if (tvData.image && (tvData.image.original || tvData.image.medium)) {
-            gorselUrl = tvData.image.original || tvData.image.medium;
+        const tmdbRes = await fetch(`https://api.themoviedb.org/3/search/tv?api_key=15d2ea6d0dc1d476efbca3eba2b9bbfb&language=tr-TR&query=${encodeURIComponent(baslik)}`);
+        if (tmdbRes.ok) {
+          const tmdbData = await tmdbRes.json();
+          if (tmdbData.results && tmdbData.results.length > 0) {
+            tmdbData.results.slice(0, 5).forEach(show => {
+              let resim = show.poster_path ? `https://image.tmdb.org/t/p/w500${show.poster_path}` : '';
+              sonuclar.push({
+                baslik: show.name || baslik,
+                gorselUrl: resim,
+                kategoriDetay: 'TMDB', 
+                yil: show.first_air_date ? show.first_air_date.substring(0,4) : ''
+              });
+            });
           }
         }
-      } catch (e) { console.warn("TVMaze hatası:", e); }
+      } catch (e) { console.warn("TMDB Dizi hatası:", e); }
 
-      if (!gorselUrl) {
+      // 2. TMDB az sonuç verirse TVMaze ile destekle
+      if (sonuclar.length < 3) {
         try {
-          const itunesRes = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(baslik)}&media=tvShow&limit=3`);
-          if (itunesRes.ok) {
-            const itunesData = await itunesRes.json();
-            if (itunesData.results && itunesData.results.length > 0) {
-              const match = itunesData.results[0];
-              if (!yazarVeyaYonetmen && match.artistName) yazarVeyaYonetmen = match.artistName;
-              if (!kategori && match.primaryGenreName) kategori = match.primaryGenreName;
-              if (match.artworkUrl100) gorselUrl = match.artworkUrl100.replace('100x100bb', '600x600bb');
+          const tvRes = await fetch(`https://api.tvmaze.com/search/shows?q=${encodeURIComponent(baslik)}`);
+          if (tvRes.ok) {
+            const tvData = await tvRes.json();
+            if (tvData && tvData.length > 0) {
+              tvData.slice(0, 5).forEach(item => {
+                const show = item.show;
+                let kat = show.genres ? show.genres.join(' / ') : '';
+                let yazar = '';
+                if (show.network && show.network.name) yazar = show.network.name;
+                else if (show.webChannel && show.webChannel.name) yazar = show.webChannel.name;
+                let resim = show.image ? (show.image.original || show.image.medium) : '';
+                
+                sonuclar.push({
+                  baslik: show.name || baslik,
+                  gorselUrl: resim,
+                  kategoriDetay: (yazar && kat) ? `${yazar} • ${kat}` : (yazar || kat || ''),
+                  yil: show.premiered ? show.premiered.substring(0,4) : ''
+                });
+              });
             }
           }
-        } catch (e) { console.warn("iTunes Dizi API hatası:", e); }
+        } catch (e) { console.warn("TVMaze hatası:", e); }
       }
     }
 
     if (tur === 'Film') {
+      // 1. Önce TMDB (Türkçe filmler ve daha iyi afişler)
       try {
-        const omdbRes = await fetch(`https://www.omdbapi.com/?apikey=trilogy&t=${encodeURIComponent(baslik)}`);
-        const omdbData = await omdbRes.json();
-        
-        if (omdbData.Response === "True") {
-          if (omdbData.Director && omdbData.Director !== "N/A") yazarVeyaYonetmen = omdbData.Director;
-          if (omdbData.Genre && omdbData.Genre !== "N/A") kategori = omdbData.Genre;
-          if (omdbData.Poster && omdbData.Poster !== "N/A") gorselUrl = omdbData.Poster;
+        const tmdbRes = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=15d2ea6d0dc1d476efbca3eba2b9bbfb&language=tr-TR&query=${encodeURIComponent(baslik)}`);
+        if (tmdbRes.ok) {
+          const tmdbData = await tmdbRes.json();
+          if (tmdbData.results && tmdbData.results.length > 0) {
+            tmdbData.results.slice(0, 5).forEach(movie => {
+              let resim = movie.poster_path ? `https://image.tmdb.org/t/p/w500${movie.poster_path}` : '';
+              sonuclar.push({
+                baslik: movie.title || baslik,
+                gorselUrl: resim,
+                kategoriDetay: 'TMDB',
+                yil: movie.release_date ? movie.release_date.substring(0,4) : ''
+              });
+            });
+          }
         }
-      } catch (e) { console.warn("OMDB Film API hatası:", e); }
+      } catch (e) { console.warn("TMDB Film hatası:", e); }
+
+      // 2. OMDB ile destekle
+      if (sonuclar.length < 3) {
+        try {
+          const omdbRes = await fetch(`https://www.omdbapi.com/?apikey=trilogy&s=${encodeURIComponent(baslik)}&type=movie`);
+          const omdbData = await omdbRes.json();
+          
+          if (omdbData.Response === "True" && omdbData.Search) {
+            for (let m of omdbData.Search.slice(0, 5)) {
+               sonuclar.push({
+                 imdbID: m.imdbID,
+                 baslik: m.Title,
+                 gorselUrl: m.Poster !== "N/A" ? m.Poster : '',
+                 kategoriDetay: 'Yönetmen/Tür detayları seçince yüklenecek...',
+                 yil: m.Year
+               });
+            }
+          }
+        } catch (e) { console.warn("OMDB Film API hatası:", e); }
+      }
     }
 
-    let birlesikDetay = '';
-    if (yazarVeyaYonetmen && kategori) birlesikDetay = `${yazarVeyaYonetmen} • ${kategori}`;
-    else if (yazarVeyaYonetmen) birlesikDetay = yazarVeyaYonetmen;
-    else if (kategori) birlesikDetay = kategori;
+    // Tekrar edenleri temizle
+    const unique = [];
+    const titles = new Set();
+    sonuclar.forEach(s => {
+      const key = `${s.baslik}-${s.yil}`;
+      if (!titles.has(key)) {
+        titles.add(key);
+        unique.push(s);
+      }
+    });
 
-    return { gorselUrl, kategoriDetay: birlesikDetay, yazarVeyaYonetmen, kategori };
+    return unique;
   };
 
   const otomatikDoldur = async () => {
@@ -125,21 +190,43 @@ export default function IzlemeArsivi() {
     }
 
     setOtomatikAramaYukleniyor(true);
+    setAramaSecenekleri([]);
     setAramaSonucuMesaj(`🔎 İnternetten ${aktifSekme.toLowerCase()} detayları aranıyor...`);
 
-    const sonuc = await detaylariVeGorseliOtomatikBul(formData.baslik, aktifSekme);
+    const sonuclar = await cokluSonucGetir(formData.baslik, aktifSekme);
 
-    if (sonuc && (sonuc.gorselUrl || sonuc.kategoriDetay)) {
-      setFormData(prev => ({
-        ...prev,
-        gorselUrl: sonuc.gorselUrl || prev.gorselUrl,
-        kategoriDetay: sonuc.kategoriDetay || prev.kategoriDetay
-      }));
-      setAramaSonucuMesaj("✨ Kapak resmi ve detay bilgileri otomatik yerleştirildi!");
+    if (sonuclar && sonuclar.length > 0) {
+      setAramaSecenekleri(sonuclar);
+      setAramaSonucuMesaj("✨ Lütfen aradığınız içeriği seçin:");
     } else {
-      setAramaSonucuMesaj("ℹ️ Özel arama tamamlandı. Görsel bağlantısını kendiniz de ekleyebilirsiniz.");
+      setAramaSonucuMesaj("ℹ️ Özel arama tamamlandı ancak tam eşleşme bulunamadı. Lütfen detayları manuel ekleyin.");
     }
     setOtomatikAramaYukleniyor(false);
+  };
+
+  const sonucSec = async (sonuc) => {
+    // Film ise ekstra detay çekelim (OMDB'den geliyorsa imdbID vardır, TMDB'den geliyorsa kategoriDetay 'TMDB' dir)
+    if (aktifSekme === 'Film' && sonuc.imdbID) {
+      setAramaSonucuMesaj("🔎 Film detayları alınıyor...");
+      try {
+        const detailRes = await fetch(`https://www.omdbapi.com/?apikey=trilogy&i=${sonuc.imdbID}`);
+        const detail = await detailRes.json();
+        let yazar = detail.Director !== "N/A" ? detail.Director : '';
+        let kat = detail.Genre !== "N/A" ? detail.Genre : '';
+        sonuc.kategoriDetay = (yazar && kat) ? `${yazar} • ${kat}` : (yazar || kat || '');
+      } catch(e) {}
+    } else if (sonuc.kategoriDetay === 'TMDB') {
+      sonuc.kategoriDetay = 'Bilgiler TMDB üzerinden sağlandı.';
+    }
+
+    setFormData(prev => ({
+      ...prev,
+      baslik: sonuc.baslik || prev.baslik,
+      gorselUrl: sonuc.gorselUrl || prev.gorselUrl,
+      kategoriDetay: sonuc.kategoriDetay || prev.kategoriDetay
+    }));
+    setAramaSecenekleri([]);
+    setAramaSonucuMesaj("✨ Seçim yapıldı ve bilgiler yerleştirildi!");
   };
 
   const userId = getCurrentUserId();
@@ -266,6 +353,7 @@ export default function IzlemeArsivi() {
     setDuzenlenenId(null);
     setFormGoster(false);
     setAramaSonucuMesaj('');
+    setAramaSecenekleri([]);
   };
 
   const sekmeIcerikleri = arsiv.filter(item => (item.tur || '').toLowerCase() === aktifSekme.toLowerCase());
@@ -398,6 +486,37 @@ export default function IzlemeArsivi() {
             <p className="text-xs font-medium text-blue-600 bg-blue-50 p-2.5 rounded-xl border border-blue-100 animate-fade-in">
               {aramaSonucuMesaj}
             </p>
+          )}
+
+          {aramaSecenekleri.length > 0 && (
+            <div className="flex flex-col gap-2 max-h-60 overflow-y-auto custom-scrollbar p-1">
+              {aramaSecenekleri.map((secenek, idx) => (
+                <div 
+                  key={idx} 
+                  onClick={() => sonucSec(secenek)}
+                  className="flex items-center gap-3 p-2 border border-gray-200 rounded-xl hover:border-blue-400 hover:bg-blue-50/50 cursor-pointer transition-all bg-white"
+                >
+                  {secenek.gorselUrl ? (
+                    <img src={secenek.gorselUrl} alt="Kapak" className="w-12 h-16 object-cover rounded shadow-xs" />
+                  ) : (
+                    <div className="w-12 h-16 bg-gray-100 rounded flex items-center justify-center text-xl shadow-xs shrink-0">
+                      {aktifSekme === 'Dizi' ? '📺' : aktifSekme === 'Film' ? '🎬' : '📚'}
+                    </div>
+                  )}
+                  <div className="flex-1">
+                    <h4 className="text-sm font-bold text-gray-800">{secenek.baslik} {secenek.yil && <span className="text-gray-400 font-normal">({secenek.yil})</span>}</h4>
+                    <p className="text-[11px] text-gray-500 line-clamp-1">{secenek.kategoriDetay}</p>
+                  </div>
+                  <button 
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); sonucSec(secenek); }}
+                    className="text-xs font-bold text-blue-600 px-3 py-1 bg-white border border-blue-200 rounded-lg shadow-sm"
+                  >
+                    Seç
+                  </button>
+                </div>
+              ))}
+            </div>
           )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

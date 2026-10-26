@@ -114,6 +114,30 @@ export default function Ayarlar() {
     }
   };
 
+  const verileriCSVIndir = () => {
+    try {
+      let csvContent = "Anahtar,Deger\n";
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('lifeos_') || key && key.startsWith('maneviyat_')) {
+          let val = localStorage.getItem(key);
+          val = val.replace(/"/g, '""');
+          csvContent += `"${key}","${val}"\n`;
+        }
+      }
+      const dataStr = 'data:text/csv;charset=utf-8,\uFEFF' + encodeURIComponent(csvContent);
+      const a = document.createElement('a');
+      a.setAttribute('href', dataStr);
+      a.setAttribute('download', `aura_lifeos_yedek_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      bildirimGoster('✅ Verileriniz CSV olarak indirildi!');
+    } catch {
+      bildirimGoster('❌ CSV dışa aktarma hatası.');
+    }
+  };
+
   const verileriYukle = (e) => {
     if (!e.target.files?.[0]) return;
     const reader = new FileReader();
@@ -218,16 +242,24 @@ export default function Ayarlar() {
         </SectionCard>
 
         {/* ── Veri güvenliği ── */}
-        <SectionCard icon="🔒" title="Veri Güvenliği & Yedekleme" description="Tüm verilerini dışa aktar veya daha önce aldığın yedeği geri yükle.">
-          <div className="flex flex-col sm:flex-row gap-3">
-            <button
-              onClick={verileriIndir}
-              className="flex-1 bg-gray-900 text-white px-5 py-3 rounded-xl font-medium text-sm hover:bg-black transition-all cursor-pointer flex items-center justify-center gap-2"
-            >
-              <span>📥</span> Yedeğimi İndir
-            </button>
-            <label className="flex-1 bg-white border border-black/10 text-gray-700 px-5 py-3 rounded-xl font-medium text-sm hover:bg-gray-50 transition-all cursor-pointer flex items-center justify-center gap-2">
-              <span>📤</span> Yedek Yükle
+        <SectionCard icon="🔒" title="Bulut ve Yerel Yedekleme" description="Tüm verilerini dışa aktar veya daha önce aldığın yedeği geri yükle.">
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                onClick={verileriIndir}
+                className="flex-1 bg-gray-900 text-white px-5 py-3 rounded-xl font-medium text-sm hover:bg-black transition-all cursor-pointer flex items-center justify-center gap-2"
+              >
+                <span>📥</span> JSON Yedeği İndir
+              </button>
+              <button
+                onClick={verileriCSVIndir}
+                className="flex-1 bg-emerald-600 text-white px-5 py-3 rounded-xl font-medium text-sm hover:bg-emerald-700 transition-all cursor-pointer flex items-center justify-center gap-2"
+              >
+                <span>📊</span> CSV Olarak Dışa Aktar
+              </button>
+            </div>
+            <label className="w-full bg-white border border-black/10 text-gray-700 px-5 py-3 rounded-xl font-medium text-sm hover:bg-gray-50 transition-all cursor-pointer flex items-center justify-center gap-2 mt-1">
+              <span>📤</span> JSON Yedeği Yükle
               <input type="file" accept=".json" onChange={verileriYukle} className="hidden" />
             </label>
           </div>

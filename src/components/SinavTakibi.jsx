@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { collection, query, where, getDocs, addDoc, updateDoc, doc, deleteDoc, setDoc } from 'firebase/firestore';
 import { db, getCurrentUserId } from '../firebase';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import { usePomo } from '../context/PomoContext';
 
 const OSYM_MUFREDATI = {
   "TYT": {
@@ -245,6 +246,55 @@ export default function SinavTakibi() {
     bos: '',
     eksikKonular: '' 
   });
+
+  // DENEME GRAFİĞİ FİLTRESİ
+  const [grafikDersFiltresi, setGrafikDersFiltresi] = useState('Tümü');
+
+  // POMODORO STATE'LERİ GLOBAL CONTEXT'TEN ALINIYOR
+  const { pomoMod, setPomoMod, pomoSure, setPomoSure, tamamlananPomo, setTamamlananPomo, setAktifSinav: setGlobalAktifSinav } = usePomo();
+
+  // Sınav seçildiğinde global aktif sınavı güncelle
+  useEffect(() => {
+    setGlobalAktifSinav(aktifSinav);
+  }, [aktifSinav, setGlobalAktifSinav]);
+
+
+
+  const togglePomodoro = () => {
+    if (Notification.permission !== "granted" && Notification.permission !== "denied") {
+      Notification.requestPermission();
+    }
+
+    if (pomoMod === 'bosta' || pomoMod === 'mola_bekliyor') {
+      setPomoMod('calisiyor');
+      if (pomoMod === 'bosta') setPomoSure(25 * 60);
+    } else if (pomoMod === 'calisiyor') {
+      setPomoMod('duraklatildi');
+    } else if (pomoMod === 'duraklatildi') {
+      setPomoMod('calisiyor');
+    }
+  };
+
+  const iptalPomodoro = () => {
+    setPomoMod('bosta');
+    setPomoSure(25 * 60);
+  };
+
+  const startMola = () => {
+    setPomoMod('mola');
+    setPomoSure(5 * 60);
+  };
+
+  const resetPomodoro = () => {
+    setPomoMod('bosta');
+    setPomoSure(25 * 60);
+  };
+
+  const formatZaman = (saniye) => {
+    const dk = Math.floor(saniye / 60);
+    const sn = saniye % 60;
+    return `${dk.toString().padStart(2, '0')}:${sn.toString().padStart(2, '0')}`;
+  };
 
   useEffect(() => {
     localStorage.setItem('lifeos_secili_sinavlar', JSON.stringify(seciliSinavTurleri));
@@ -613,14 +663,14 @@ export default function SinavTakibi() {
       </div>
 
       {/* TAB MENÜSÜ */}
-      <div className="flex gap-2 border-b border-black/5 pb-2">
-        {['Konular', 'Günlük Görevler', 'Deneme Analizi'].map(tab => (
+      <div className="flex gap-2 overflow-x-auto border-b border-black/5 pb-2 custom-scrollbar">
+        {['Konular', 'Günlük Görevler', 'Deneme Analizi', 'Pomodoro'].map(tab => (
           <button
             key={tab}
             onClick={() => setAktifTab(tab)}
-            className={`px-5 py-2.5 rounded-2xl text-xs sm:text-sm font-medium transition cursor-pointer ${aktifTab === tab ? 'bg-gray-900 text-white shadow-xs' : 'text-gray-500 hover:bg-black/5'}`}
+            className={`px-5 py-2.5 rounded-2xl text-xs sm:text-sm font-medium transition cursor-pointer whitespace-nowrap ${aktifTab === tab ? 'bg-gray-900 text-white shadow-xs' : 'text-gray-500 hover:bg-black/5'}`}
           >
-            {tab === 'Konular' ? '📚 Konu Müfredatı' : tab === 'Günlük Görevler' ? '🎯 Günlük Çalışma Günlüğü' : '📊 Deneme Analizi'}
+            {tab === 'Konular' ? '📚 Konu Müfredatı' : tab === 'Günlük Görevler' ? '🎯 Çalışma Günlüğü' : tab === 'Deneme Analizi' ? '📊 Deneme Analizi' : '🍅 Pomodoro'}
           </button>
         ))}
       </div>
@@ -945,17 +995,42 @@ export default function SinavTakibi() {
 
           {/* DENEME GRAFİĞİ */}
           {denemeler.length > 0 && (
-            <div className="bg-white/80 backdrop-blur-xl p-5 sm:p-6 rounded-[2rem] shadow-sm border border-black/5 space-y-4 h-64">
-              <h3 className="font-serif text-sm text-gray-900 font-normal border-b border-black/5 pb-2">Net Gelişim Grafiği</h3>
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={[...denemeler].reverse()} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                  <XAxis dataKey="tarih" tick={{ fontSize: 10 }} tickFormatter={t => t.slice(5)} />
-                  <YAxis tick={{ fontSize: 10 }} />
-                  <Tooltip contentStyle={{ borderRadius: '12px', border: 'none' }} />
-                  <Line type="monotone" dataKey={(d) => d.dogru - (d.yanlis * 0.25)} name="Net" stroke="#3b82f6" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
-                </LineChart>
-              </ResponsiveContainer>
+            <div className="bg-white/80 backdrop-blur-xl p-5 sm:p-6 rounded-[2rem] shadow-sm border border-black/5 space-y-4">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-black/5 pb-3 gap-3">
+                <h3 className="font-serif text-sm sm:text-base text-gray-900 font-normal">Net Gelişim Grafiği</h3>
+                
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-500 font-medium">Filtre:</span>
+                  <select 
+                    value={grafikDersFiltresi}
+                    onChange={(e) => setGrafikDersFiltresi(e.target.value)}
+                    className="bg-gray-50 border border-gray-200 text-xs text-gray-700 py-1.5 px-3 rounded-lg focus:outline-none"
+                  >
+                    <option value="Tümü">Tüm Dersler (Karma)</option>
+                    {[...new Set(denemeler.map(d => d.ders))].map(d => (
+                      <option key={d} value={d}>{d}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              
+              {denemeler.filter(d => grafikDersFiltresi === 'Tümü' || d.ders === grafikDersFiltresi).length > 0 ? (
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={[...denemeler.filter(d => grafikDersFiltresi === 'Tümü' || d.ders === grafikDersFiltresi)].reverse()} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                      <XAxis dataKey="tarih" tick={{ fontSize: 10 }} tickFormatter={t => t.slice(5)} />
+                      <YAxis tick={{ fontSize: 10 }} />
+                      <Tooltip contentStyle={{ borderRadius: '12px', border: 'none' }} />
+                      <Line type="monotone" dataKey={(d) => d.dogru - (d.yanlis * 0.25)} name="Net" stroke="#3b82f6" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <div className="h-64 flex items-center justify-center text-gray-400 text-xs font-light">
+                  Seçilen ders için henüz deneme verisi yok.
+                </div>
+              )}
             </div>
           )}
 
@@ -1025,6 +1100,98 @@ export default function SinavTakibi() {
               )}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* 4. TAB: POMODORO SİSTEMİ */}
+      {aktifTab === 'Pomodoro' && (
+        <div className="space-y-6 animate-fade-in flex flex-col items-center justify-center py-10">
+          
+          <div className="bg-white/80 backdrop-blur-xl p-8 sm:p-12 rounded-[3rem] shadow-sm border border-black/5 flex flex-col items-center max-w-md w-full relative overflow-hidden">
+            {/* Arka plan süsü */}
+            <div className={`absolute -top-20 -right-20 w-64 h-64 rounded-full blur-3xl opacity-20 pointer-events-none transition-colors duration-1000 ${pomoMod === 'calisiyor' ? 'bg-red-500' : pomoMod === 'mola' ? 'bg-green-500' : 'bg-blue-500'}`}></div>
+
+            <div className="text-center space-y-2 mb-8 relative z-10">
+              <h3 className="font-serif text-2xl text-gray-900">
+                {pomoMod === 'bosta' || pomoMod === 'duraklatildi' ? 'Çalışma Vakti' : 
+                 pomoMod === 'calisiyor' ? 'Odaklanma Devam Ediyor...' : 
+                 pomoMod === 'mola' ? 'Mola Zamanı ☕' : 'Tebrikler! Mola Vakti 🎉'}
+              </h3>
+              <p className="text-xs text-gray-500 font-light">
+                {pomoMod === 'bosta' ? '25 dakikalık odaklanma seansına başla.' : 
+                 pomoMod === 'calisiyor' ? 'Dış etkenleri yoksay, sadece hedefine odaklan.' :
+                 pomoMod === 'mola_bekliyor' ? 'Çalışma süren bitti, biraz ara vermelisin.' : 'Zihnini dinlendir, birazdan devam edeceğiz.'}
+              </p>
+            </div>
+
+            {/* Sayaç */}
+            <div className="relative mb-10 group z-10">
+              <div className={`w-48 h-48 sm:w-56 sm:h-56 rounded-full flex items-center justify-center border-[8px] transition-all duration-500 shadow-inner bg-white ${
+                pomoMod === 'calisiyor' ? 'border-red-400 text-red-500' : 
+                pomoMod === 'mola' ? 'border-green-400 text-green-500' : 
+                'border-gray-200 text-gray-700'
+              }`}>
+                <span className="text-5xl sm:text-6xl font-mono font-bold tracking-tighter">
+                  {formatZaman(pomoSure)}
+                </span>
+              </div>
+            </div>
+
+            {/* Kontroller */}
+            <div className="flex flex-wrap gap-3 justify-center z-10">
+              {pomoMod === 'mola_bekliyor' ? (
+                <button 
+                  onClick={startMola} 
+                  className="px-8 py-4 bg-green-500 text-white rounded-2xl font-bold hover:bg-green-600 transition shadow-md shadow-green-500/20 active:scale-95"
+                >
+                  ☕ Molayı Başlat (5 Dk)
+                </button>
+              ) : (
+                <>
+                  <button 
+                    onClick={togglePomodoro} 
+                    className={`px-10 py-4 rounded-2xl font-bold transition shadow-md active:scale-95 text-sm ${
+                      pomoMod === 'calisiyor' 
+                        ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' 
+                        : 'bg-gray-900 text-white hover:bg-black shadow-black/10'
+                    }`}
+                  >
+                    {pomoMod === 'calisiyor' ? '⏸ Duraklat' : pomoMod === 'duraklatildi' ? '▶ Devam Et' : '▶ Başlat'}
+                  </button>
+                  
+                  {(pomoMod === 'duraklatildi' || (pomoMod === 'bosta' && pomoSure !== 25 * 60) || pomoMod === 'mola') && (
+                    <button 
+                      onClick={resetPomodoro} 
+                      className="px-6 py-4 bg-gray-100 text-gray-600 rounded-2xl font-bold hover:bg-gray-200 transition active:scale-95 text-sm"
+                    >
+                      🔄 Sıfırla
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+
+            {/* İstatistik */}
+            <div className="mt-8 pt-6 border-t border-black/5 w-full text-center z-10 flex flex-col items-center">
+              <p className="text-xs text-gray-400 font-semibold uppercase tracking-wider mb-2">Bugünkü Tamamlanan</p>
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">🍅</span>
+                <span className="text-3xl font-bold text-gray-800">x {tamamlananPomo}</span>
+              </div>
+              <button 
+                onClick={() => {
+                  if(window.confirm('Tamamlanan pomodoro sayısını sıfırlamak istiyor musunuz?')) {
+                    setTamamlananPomo(0);
+                    localStorage.setItem('lifeos_pomo_sayisi', 0);
+                  }
+                }}
+                className="mt-4 text-[10px] text-gray-400 hover:text-red-500 underline decoration-dotted transition"
+              >
+                Sayacı Sıfırla
+              </button>
+            </div>
+          </div>
+
         </div>
       )}
     </div>

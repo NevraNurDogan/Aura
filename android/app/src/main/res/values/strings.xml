@@ -1,0 +1,8 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Aura</string>
+    <string name="title_activity_main">Aura</string>
+    <string name="package_name">com.nevranur.lifeos</string>
+    <string name="custom_url_scheme">com.nevranur.lifeos</string>
+    <string name="server_client_id">1071239396934-tsjg69pqhmtc7oje5kigf9f1k8nqbi4b.apps.googleusercontent.com</string>
+</resources>

@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
+import { getFirestore, enableIndexedDbPersistence } from "firebase/firestore";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
 
 const firebaseConfig = {
@@ -14,6 +14,14 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
+
+enableIndexedDbPersistence(db).catch((err) => {
+  if (err.code === 'failed-precondition') {
+    console.warn('Firestore offline: Çoklu sekme açık');
+  } else if (err.code === 'unimplemented') {
+    console.warn('Firestore offline: Tarayıcı desteklemiyor');
+  }
+});
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 

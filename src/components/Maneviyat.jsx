@@ -574,6 +574,7 @@ export default function Maneviyat() {
   // Şehir seçimi kaydet
   useEffect(() => {
     localStorage.setItem('maneviyat_sehir', sehir);
+    window.dispatchEvent(new Event('sehirDegisti'));
   }, [sehir]);
 
   // Favorileri kaydet
