@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { collection, query, where, getDocs, setDoc, doc, getDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, setDoc, doc, onSnapshot } from 'firebase/firestore';
 import { db, getCurrentUserId } from '../firebase';
 
 // Esma-ül Hüsna (Allah'ın 99 İsmi)
@@ -479,7 +479,7 @@ export default function Maneviyat() {
       // 2. Life-OS Firebase Güncellemesi
       try {
         const userId = getCurrentUserId();
-        if (userId) {
+        if (userId && userId !== 'misafir') {
           setDoc(doc(db, 'spirituality', `${userId}_${tarihStr}`), {
             userId,
             id: tarihStr,
@@ -584,20 +584,8 @@ export default function Maneviyat() {
 
   // Maneviyat verisi çekme
   useEffect(() => {
-    const veriCek = async () => {
-      try {
-        const userId = getCurrentUserId();
-        if (userId) {
-          const snap = await getDoc(doc(db, 'spirituality', `${userId}_${bugunStr}`));
-          if (snap.exists()) {
-            setManeviyatState(prev => ({ ...prev, ...snap.data() }));
-            return;
-          }
-        }
-      } catch (err) {
-        // Sessiz fallback
-      }
-
+    const userId = getCurrentUserId();
+    if (!userId || userId === 'misafir') {
       const kayitliLocal = localStorage.getItem(`maneviyat_state_${bugunStr}`);
       if (kayitliLocal) {
         try {
@@ -606,8 +594,58 @@ export default function Maneviyat() {
           console.error("Localstate okuma hatası", e);
         }
       }
-    };
-    veriCek();
+      return undefined;
+    }
+
+    const namazListener = query(
+      collection(db, 'spirituality'),
+      where('userId', '==', userId)
+    );
+
+    const unsubscribe = onSnapshot(
+      namazListener,
+      (snapshot) => {
+        setNamazGecmisi(prev => {
+          const firestoreGecmis = { ...prev };
+
+          snapshot.docs.forEach(gunDoc => {
+            const veri = gunDoc.data();
+            const tarih = veri.id || gunDoc.id.replace(`${userId}_`, '');
+            if (!tarih) return;
+
+            firestoreGecmis[tarih] = {
+              sabahVakti: false,
+              ogleVakti: false,
+              ikindiVakti: false,
+              aksamVakti: false,
+              yatsiVakti: false,
+              ...prev[tarih],
+              ...veri
+            };
+          });
+
+          localStorage.setItem('maneviyat_namaz_gecmisi', JSON.stringify(firestoreGecmis));
+          return firestoreGecmis;
+        });
+
+        snapshot.docs.forEach(gunDoc => {
+          const veri = gunDoc.data();
+          const tarih = veri.id || gunDoc.id.replace(`${userId}_`, '');
+          if (tarih !== bugunStr) return;
+
+          setManeviyatState(prev => {
+            const yeniState = { ...prev, ...veri };
+            localStorage.setItem(`maneviyat_state_${bugunStr}`, JSON.stringify(yeniState));
+            return yeniState;
+          });
+        });
+      },
+      (error) => {
+        console.warn('Namaz takibi gerçek zamanlı senkronizasyonu başlatılamadı:', error);
+      }
+    );
+
+    return () => unsubscribe();
   }, [bugunStr]);
 
   const guncelleState = async (yeniData) => {
@@ -616,7 +654,7 @@ export default function Maneviyat() {
 
     try {
       const userId = getCurrentUserId();
-      if (userId) {
+      if (userId && userId !== 'misafir') {
         await setDoc(doc(db, 'spirituality', `${userId}_${bugunStr}`), {
           userId,
           id: bugunStr,
@@ -782,9 +820,9 @@ export default function Maneviyat() {
         }
       }
 
-      let siradakiVakit = '';
+      let siradakiVakit;
       let oncekiVakitSaniye = 0;
-      let sonrakiVakitSaniye = 86400;
+      let sonrakiVakitSaniye;
 
       if (siradakiVakitIndex !== -1) {
         siradakiVakit = vakitlerListesi[siradakiVakitIndex].ad;

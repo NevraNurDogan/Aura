@@ -25,7 +25,6 @@
 - 🔐 **Firebase Auth** ile güvenli giriş (Google + E-posta)
 - ☁️ **Firestore** ile bulut tabanlı veri senkronizasyonu
 - 📱 **PWA** desteği — cihazına yükleyebilirsin
-- 🤖 **Gemini AI** destekli akıllı asistan
 
 ---
 
@@ -44,7 +43,6 @@
 | ☽ **Maneviyat & Huzur** | Namaz vakitleri, dua & zikir rutinleri |
 | 📊 **İstatistikler** | Genel kullanım istatistikleri |
 | ⚯ **Sosyal & Odalar** | Topluluk ve motivasyon |
-| 🤖 **AI Asistan** | Gemini destekli kişisel asistan |
 
 ---
 
@@ -53,7 +51,6 @@
 - **Frontend:** React 19 + Vite 8
 - **Styling:** Tailwind CSS v4
 - **Backend & Database:** Firebase (Firestore + Authentication)
-- **AI:** Google Gemini API
 - **Veri Görselleştirme:** Recharts
 - **PWA:** vite-plugin-pwa
 - **Mobil:** Capacitor (Android)

@@ -1,7 +1,8 @@
-import React, { useState, useEffect, Suspense, lazy } from 'react';
+import { useState, useEffect, Suspense, lazy } from 'react';
 import { auth, googleProvider } from './firebase';
 import { signInWithPopup, signInWithCredential, GoogleAuthProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged } from 'firebase/auth';
 import { Capacitor } from '@capacitor/core';
+import { App as CapacitorApp } from '@capacitor/app';
 import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
 const AnaSayfa = lazy(() => import('./components/AnaSayfa'));
 const Ajanda = lazy(() => import('./components/Ajanda'));
@@ -15,7 +16,6 @@ const Profil = lazy(() => import('./components/Profil'));
 const Istatistikler = lazy(() => import('./components/Istatistikler'));
 const Takvim = lazy(() => import('./components/Takvim'));
 const Ayarlar = lazy(() => import('./components/Ayarlar'));
-const AiAsistan = lazy(() => import('./components/AiAsistan'));
 const Sosyal = lazy(() => import('./components/Sosyal'));
 
 const YukeIkonu = () => (
@@ -103,7 +103,7 @@ const MODULLER = {
 /* ═══════════════════════════════════════════════════════════════
    GİRİŞ EKRANI
 ═══════════════════════════════════════════════════════════════ */
-function GirisEkrani({ onDevam }) {
+function GirisEkrani() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLogin, setIsLogin] = useState(true);
@@ -253,16 +253,6 @@ function GirisEkrani({ onDevam }) {
           </button>
         </div>
 
-        <button 
-          onClick={handleInstallClick}
-          className="mt-6 w-full py-3.5 rounded-2xl font-semibold text-sm bg-blue-50 border border-blue-100 text-blue-600 hover:bg-blue-100 transition-all cursor-pointer shadow-sm flex items-center justify-center gap-2"
-        >
-          📱 Uygulamayı Cihazına Yükle
-        </button>
-
-        <p className="text-center text-xs text-gray-400 mt-5 font-light">
-          Verileriniz güvenle bulutta saklanır ve tüm cihazlarınızda anında senkronize edilir.
-        </p>
       </div>
     </div>
   );
@@ -413,6 +403,9 @@ function OnboardingEkrani({ seciliModuller, toggleModul, onBitir }) {
 ═══════════════════════════════════════════════════════════════ */
 function App() {
   const [kullaniciAdi, setKullaniciAdi] = useState('');
+  const [profilAvatar, setProfilAvatar] = useState(() =>
+    localStorage.getItem('lifeos_profil_avatar') || auth.currentUser?.photoURL || ''
+  );
   const [akim, setAkim] = useState('giris'); 
   const [authChecked, setAuthChecked] = useState(false);
 
@@ -422,6 +415,7 @@ function App() {
         localStorage.setItem('lifeos_kullanici', user.uid);
         const gercekIsim = user.displayName || user.email.split('@')[0] || 'Kullanıcı';
         setKullaniciAdi(gercekIsim);
+        setProfilAvatar(localStorage.getItem('lifeos_profil_avatar') || user.photoURL || '');
         
         // Profil ismini zorla düzelt
         const mevcutProfilIsmi = localStorage.getItem('lifeos_profil_isim');
@@ -442,14 +436,82 @@ function App() {
     return () => unsubscribe();
   }, []);
 
+  useEffect(() => {
+    const avatarGuncelle = () =>
+      setProfilAvatar(localStorage.getItem('lifeos_profil_avatar') || auth.currentUser?.photoURL || '');
+
+    window.addEventListener('storage', avatarGuncelle);
+    window.addEventListener('profilGuncellendi', avatarGuncelle);
+    return () => {
+      window.removeEventListener('storage', avatarGuncelle);
+      window.removeEventListener('profilGuncellendi', avatarGuncelle);
+    };
+  }, []);
+
   const [aktifSayfa, setAktifSayfa] = useState('anasayfa');
   const [mobileMenuAcik, setMobileMenuAcik] = useState(false);
+
+  useEffect(() => {
+    window.history.replaceState(
+      { ...(window.history.state || {}), auraPage: 'anasayfa' },
+      '',
+      window.location.href
+    );
+
+    const tarayiciGeriDinleyici = (event) => {
+      if (mobileMenuAcik) {
+        setMobileMenuAcik(false);
+        window.history.pushState(
+          { ...(window.history.state || {}), auraPage: aktifSayfa },
+          '',
+          window.location.href
+        );
+        return;
+      }
+
+      const oncekiSayfa = event.state?.auraPage;
+      if (oncekiSayfa && oncekiSayfa !== aktifSayfa) {
+        setAktifSayfa(oncekiSayfa);
+      } else if (aktifSayfa !== 'anasayfa') {
+        setAktifSayfa('anasayfa');
+        window.history.pushState(
+          { ...(window.history.state || {}), auraPage: 'anasayfa' },
+          '',
+          window.location.href
+        );
+      }
+    };
+
+    window.addEventListener('popstate', tarayiciGeriDinleyici);
+    return () => window.removeEventListener('popstate', tarayiciGeriDinleyici);
+  }, [aktifSayfa, mobileMenuAcik]);
+
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return undefined;
+
+    let geriDinleyici;
+    CapacitorApp.addListener('backButton', () => {
+      if (mobileMenuAcik) {
+        setMobileMenuAcik(false);
+      } else if (aktifSayfa !== 'anasayfa') {
+        setAktifSayfa('anasayfa');
+      } else {
+        CapacitorApp.exitApp();
+      }
+    }).then((dinleyici) => {
+      geriDinleyici = dinleyici;
+    });
+
+    return () => {
+      geriDinleyici?.remove();
+    };
+  }, [aktifSayfa, mobileMenuAcik]);
 
   const [seciliModuller, setSeciliModuller] = useState(() => {
     const kayitli = localStorage.getItem('lifeos_secili_moduller');
     if (kayitli) {
       let parsed = JSON.parse(kayitli);
-      // Eski sürümden kalan "duzen" anahtarını "gunluk" olarak güncelle
+    
       if (parsed.duzen !== undefined && parsed.gunluk === undefined) {
         parsed.gunluk = parsed.duzen;
         delete parsed.duzen;
@@ -457,7 +519,7 @@ function App() {
       }
       return parsed;
     }
-    return { gunluk: true, cilt: true, izleme: true, sinav: true, dongu: true, maneviyat: true };
+    return { ajanda: true, gunluk: true, cilt: true, izleme: true, sinav: true, dongu: true, maneviyat: true };
   });
 
   useEffect(() => {
@@ -475,8 +537,22 @@ function App() {
     setSeciliModuller(prev => ({ ...prev, [modul]: !prev[modul] }));
 
   const sayfaDegistir = (sayfaId) => {
+    if (sayfaId !== aktifSayfa) {
+      window.history.pushState(
+        { ...(window.history.state || {}), auraPage: sayfaId },
+        '',
+        window.location.href
+      );
+    }
     setAktifSayfa(sayfaId);
     setMobileMenuAcik(false);
+  };
+
+  const bildirimleriAc = () => {
+    sayfaDegistir('anasayfa');
+    window.setTimeout(() => {
+      window.dispatchEvent(new Event('auraBildirimleriAc'));
+    }, 0);
   };
 
   const sayfaBasliklari = {
@@ -492,17 +568,6 @@ function App() {
     ayarlar: 'Ayarlar & Görünüm',
     maneviyat: 'Maneviyat & Huzur',
     sosyal: 'Aura Topluluğu',
-  };
-
-  const sayfaIkonlari = {
-    anasayfa: '✦',
-    gunluk: '❖',
-    cilt: '✦',
-    izleme: '◈',
-    sinav: '◎',
-    dongu: '○',
-    maneviyat: '☽',
-    sosyal: '👥',
   };
 
   if (!authChecked) {
@@ -557,12 +622,30 @@ function App() {
             </p>
           </div>
         </div>
-        <button
-          onClick={() => sayfaDegistir('profil')}
-          className="w-9 h-9 rounded-full bg-gradient-to-tr from-blue-500 to-purple-500 text-white font-bold flex items-center justify-center text-sm shadow-sm cursor-pointer"
-        >
-          ✧
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={bildirimleriAc}
+            className="w-9 h-9 rounded-full bg-white/80 border border-black/5 text-gray-500 flex items-center justify-center shadow-sm cursor-pointer"
+            aria-label="Bildirimleri aç"
+            title="Bildirimler"
+          >
+            🔔
+          </button>
+          <button
+            onClick={() => sayfaDegistir('profil')}
+            className="w-9 h-9 rounded-full border-2 border-white shadow-sm cursor-pointer overflow-hidden bg-gradient-to-tr from-blue-500 to-purple-500"
+            aria-label="Profil sayfasını aç"
+            title="Profil"
+          >
+            {profilAvatar ? (
+              <img src={profilAvatar} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <span className="w-full h-full flex items-center justify-center text-white text-sm font-bold">
+                {kullaniciAdi?.charAt(0).toUpperCase() || 'A'}
+              </span>
+            )}
+          </button>
+        </div>
       </header>
 
       {mobileMenuAcik && (
@@ -579,6 +662,30 @@ function App() {
             <p className="text-[11px] text-gray-400 mt-0.5 tracking-wide uppercase font-medium">
               {kullaniciAdi ? `Merhaba, ${kullaniciAdi}` : 'Personal Workspace'}
             </p>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={bildirimleriAc}
+              className="w-9 h-9 rounded-full bg-white border border-black/5 text-gray-500 flex items-center justify-center shadow-sm cursor-pointer"
+              aria-label="Bildirimleri aç"
+              title="Bildirimler"
+            >
+              🔔
+            </button>
+            <button
+              onClick={() => sayfaDegistir('profil')}
+              className="w-9 h-9 rounded-full border-2 border-white shadow-sm cursor-pointer overflow-hidden bg-gradient-to-tr from-blue-500 to-purple-500"
+              aria-label="Profil sayfasını aç"
+              title="Profil"
+            >
+              {profilAvatar ? (
+                <img src={profilAvatar} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <span className="w-full h-full flex items-center justify-center text-white text-sm font-bold">
+                  {kullaniciAdi?.charAt(0).toUpperCase() || 'A'}
+                </span>
+              )}
+            </button>
           </div>
           <button
             onClick={() => setMobileMenuAcik(false)}
@@ -641,7 +748,7 @@ function App() {
 
           <div className="pt-4 mt-4 border-t border-black/5">
             <button onClick={() => sayfaDegistir('istatistikler')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-left text-sm transition-all cursor-pointer ${aktifSayfa === 'istatistikler' ? 'bg-white text-gray-900 font-semibold shadow-sm shadow-black/5 border border-black/5' : 'text-gray-500 hover:bg-black/5 hover:text-gray-800 font-normal'}`}>
-              <span className="text-lg">📊</span> İstatistikler
+              <span className="text-lg">◫</span> İstatistikler
             </button>
             <button onClick={() => sayfaDegistir('sosyal')} className={`w-full flex items-center gap-3 px-4 py-3 mt-1 rounded-2xl text-left text-sm transition-all cursor-pointer ${aktifSayfa === 'sosyal' ? 'bg-white text-gray-900 font-semibold shadow-sm shadow-black/5 border border-black/5' : 'text-gray-500 hover:bg-black/5 hover:text-gray-800 font-normal'}`}>
               <span className="text-lg">⚯</span> Sosyal & Odalar
@@ -705,8 +812,6 @@ function App() {
         )}
       </main>
 
-      {/* AI ASİSTAN */}
-      <AiAsistan setAktifSayfa={sayfaDegistir} />
     </div>
   );
 }

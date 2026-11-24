@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { BarChart, Bar, LineChart, Line, XAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import confetti from 'canvas-confetti';
 import { collection, query, where, getDocs, setDoc, doc, getDoc } from 'firebase/firestore';
@@ -26,6 +27,16 @@ export default function Profil() {
   const [isiHaritasiVerisi, setIsiHaritasiVerisi] = useState([]);
   
   const [ozetModalAcik, setOzetModalAcik] = useState(false);
+
+  useEffect(() => {
+    if (!ozetModalAcik) return undefined;
+
+    const oncekiTasima = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = oncekiTasima;
+    };
+  }, [ozetModalAcik]);
 
   const tumRozetler = [
     // Alışkanlık Serileri
@@ -296,6 +307,7 @@ export default function Profil() {
     localStorage.setItem('lifeos_profil_xp', profilData.xp.toString());
     localStorage.setItem('lifeos_profil_level', profilData.level.toString());
     localStorage.setItem('lifeos_profil_rozetler', profilData.kazanilanRozetler || '');
+    window.dispatchEvent(new Event('profilGuncellendi'));
 
     try {
       await setDoc(doc(db, 'profiles', userId), profilData, { merge: true });
@@ -324,6 +336,8 @@ export default function Profil() {
 
     localStorage.setItem('lifeos_profil_isim', yeniIsim);
     localStorage.setItem('lifeos_profil_avatar', yeniAvatar);
+
+    window.dispatchEvent(new Event('profilGuncellendi'));
 
     try {
       await setDoc(doc(db, 'profiles', userId), payload, { merge: true });
@@ -381,17 +395,18 @@ export default function Profil() {
                 className="w-full p-2.5 border border-gray-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-blue-400 bg-gray-50" 
               />
               
-              <div className="relative w-full">
-                <input 
-                  type="file" 
-                  accept="image/*" 
-                  onChange={handleGorselYukle} 
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
+              <label className="relative block w-full cursor-pointer">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleGorselYukle}
+                  className="hidden"
+                  aria-label="Profil fotoğrafı seç"
                 />
-                <div className="w-full p-2.5 border border-dashed border-gray-300 rounded-xl text-xs text-gray-500 bg-gray-50 text-center hover:bg-gray-100 transition">
+                <span className="flex w-full items-center justify-center gap-1.5 p-2.5 border border-dashed border-gray-300 rounded-xl text-xs text-gray-500 bg-gray-50 text-center hover:bg-gray-100 transition">
                   {yeniAvatar && yeniAvatar.length > 100 ? '📸 Görsel Seçildi' : '📁 Fotoğraf Seç'}
-                </div>
-              </div>
+                </span>
+              </label>
 
               <div className="flex gap-2">
                 <button onClick={() => setDuzenlemeModu(false)} className="flex-1 bg-gray-100 text-gray-600 py-2 rounded-xl text-xs font-bold hover:bg-gray-200 transition cursor-pointer">İptal</button>
@@ -574,11 +589,21 @@ export default function Profil() {
 
       {/* HAFTALIK ÖZET (SPOTIFY WRAPPED) MODALI */}
       {ozetModalAcik && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-          <div className="bg-gradient-to-br from-indigo-900 via-purple-900 to-black w-full max-w-sm rounded-[2.5rem] shadow-2xl border border-white/10 overflow-hidden relative">
+        createPortal(
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="aura-ozet-baslik"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setOzetModalAcik(false);
+          }}
+        >
+          <div className="relative w-full max-w-sm max-h-[90vh] overflow-y-auto rounded-[2.5rem] bg-gradient-to-br from-indigo-900 via-purple-900 to-black shadow-2xl border border-white/10">
             <button 
               onClick={() => setOzetModalAcik(false)}
               className="absolute top-5 right-5 w-8 h-8 flex items-center justify-center bg-white/10 hover:bg-white/20 text-white rounded-full transition z-10 cursor-pointer"
+              aria-label="Özet modalını kapat"
             >
               ✕
             </button>
@@ -586,7 +611,7 @@ export default function Profil() {
             <div className="p-8 pb-12 flex flex-col items-center text-center relative z-0">
               <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-20 pointer-events-none"></div>
               
-              <h2 className="text-3xl font-serif text-white font-bold mb-2">Aura Özetin</h2>
+              <h2 id="aura-ozet-baslik" className="text-3xl font-serif text-white font-bold mb-2">Aura Özetin</h2>
               <p className="text-sm text-purple-200 font-light mb-8">Senin için geride bıraktığın haftanın kısa bir hikayesi.</p>
               
               <div className="space-y-4 w-full">
@@ -617,7 +642,9 @@ export default function Profil() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
+        )
       )}
     </div>
   );

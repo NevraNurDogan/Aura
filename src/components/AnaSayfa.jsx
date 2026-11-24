@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, query, where, getDocs, doc, updateDoc, getDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, updateDoc, getDoc, setDoc } from 'firebase/firestore';
 import { db, getCurrentUserId } from '../firebase';
 import { Capacitor } from '@capacitor/core';
 import { LocalNotifications } from '@capacitor/local-notifications';
@@ -34,9 +34,14 @@ const TURKCE_MOTIVASYON_SOZLERI = [
 export default function AnaSayfa({ seciliModuller, setAktifSayfa }) {
   const [yaklasanEtkinlikler, setYaklasanEtkinlikler] = useState([]);
   const [birlesikGorevler, setBirlesikGorevler] = useState([]);
-  const [aramaMetni, setAramaMetni] = useState('');
   
   const [bildirimAcik, setBildirimAcik] = useState(false);
+
+  useEffect(() => {
+    const bildirimleriAc = () => setBildirimAcik(true);
+    window.addEventListener('auraBildirimleriAc', bildirimleriAc);
+    return () => window.removeEventListener('auraBildirimleriAc', bildirimleriAc);
+  }, []);
   
   const [donguOzeti, setDonguOzeti] = useState("Veriler yükleniyor...");
   const [izlemeOzeti, setIzlemeOzeti] = useState("Kütüphane yükleniyor...");
@@ -216,15 +221,30 @@ export default function AnaSayfa({ seciliModuller, setAktifSayfa }) {
         console.error("Alışkanlık çekilemedi.");
       }
 
-      setXp(toplamGorevXP);
-      setLevel(Math.floor(toplamGorevXP / 500) + 1);
+      // Profil bilgilerini Firestore'dan oku (Sosyal ile aynı kaynak)
+      try {
+        const profilSnap = await getDoc(doc(db, 'profiles', userId));
+        if (profilSnap.exists()) {
+          const pd = profilSnap.data();
+          // Profil'deki XP'yi kullan (Profil sayfası daha kapsamlı hesaplıyor)
+          const gercekXP = pd.xp || toplamGorevXP;
+          const gercekLevel = pd.level || Math.floor(toplamGorevXP / 500) + 1;
+          setXp(gercekXP);
+          setLevel(gercekLevel);
+          
+          const rozetler = pd.kazanilanRozetler ? pd.kazanilanRozetler.split(',').filter(Boolean) : [];
+          const rozetIkonlari = { '1': '🔥', '2': '⚡', '3': '🛡️', '4': '💎', '5': '🌋', '6': '📚', '7': '🎯', '8': '🧠' };
+          setKazanilanRozetler(rozetler.slice(0, 5).map(id => ({ id, ikon: rozetIkonlari[id] || '🏅', ad: `Rozet #${id}` })));
+        } else {
+          setXp(toplamGorevXP);
+          setLevel(Math.floor(toplamGorevXP / 500) + 1);
+        }
+      } catch(e) {
+        setXp(toplamGorevXP);
+        setLevel(Math.floor(toplamGorevXP / 500) + 1);
+      }
 
-      const kazanilanlar = [];
-      if (enYuksekSeri >= 3) kazanilanlar.push({ id: 1, ikon: '🔥', ad: '3 Günlük Seri: Ateşli Başlangıç' });
-      if (enYuksekSeri >= 7) kazanilanlar.push({ id: 2, ikon: '⚡', ad: '7 Günlük Seri: İstikrar Abidesi' });
-      if (enYuksekSeri >= 14) kazanilanlar.push({ id: 3, ikon: '🛡️', ad: '14 Günlük Seri: Bozulmaz İrade' });
-      if (enYuksekSeri >= 30) kazanilanlar.push({ id: 4, ikon: '💎', ad: '30 Günlük Seri: Efsanevi Titan' });
-      setKazanilanRozetler(kazanilanlar);
+      // Rozetler artık profiles'tan okunuyor (yukarıda), burayı boş bırakıyoruz
 
       if (resSinav.status === 'fulfilled' && resSinav.value) {
         const data = resSinav.value.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -403,51 +423,31 @@ export default function AnaSayfa({ seciliModuller, setAktifSayfa }) {
       }
     } catch (error) {
       console.error("Görev güncellenirken hata oluştu:", error);
-      // Hata olursa geri al
+     
       setBirlesikGorevler(prev => prev.map(g => g.id === gorev.id ? { ...g, tamamlandi: !yeniDurum } : g));
     }
   };
 
-  const filtrelenmisGorevler = birlesikGorevler.filter(g => g.baslik.toLowerCase().includes(aramaMetni.toLowerCase()));
   const eksikGorevler = birlesikGorevler.filter(g => !g.tamamlandi);
   const hedefXp = level * 500;
+  const mevcutLevelXP = xp % 500;
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
-      
-      {/* 1. ÜST BAR: GLOBAL ARAMA VE BİLDİRİM ZİLİ */}
-      <div className="flex justify-between items-center gap-3">
-        <div className="flex-1 relative group">
-          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors">🔍</span>
-          <input 
-            type="text" 
-            placeholder="Görev, alışkanlık veya rutin ara..." 
-            value={aramaMetni}
-            onChange={(e) => setAramaMetni(e.target.value)}
-            className="w-full bg-white/80 border border-black/5 rounded-[1.25rem] py-3.5 pl-11 pr-4 text-xs sm:text-sm focus:outline-none focus:border-blue-400 shadow-xs"
-          />
-        </div>
-        
-        <div className="relative shrink-0">
-          <button 
-            onClick={() => setBildirimAcik(!bildirimAcik)}
-            className={`w-[52px] h-[52px] rounded-[1.25rem] border flex items-center justify-center text-xl transition-all cursor-pointer 
-              ${bildirimAcik ? 'bg-blue-50 border-blue-200 text-blue-600' : 'bg-white/80 border-black/5 text-gray-400 hover:bg-white shadow-xs'}`}
-          >
-            🔔
-          </button>
-          
-          {eksikGorevler.length > 0 && (
-            <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] font-bold flex items-center justify-center rounded-full border-2 border-white animate-bounce shadow-sm">
-              {eksikGorevler.length}
-            </span>
-          )}
-
-          {bildirimAcik && (
-            <div className="absolute right-0 top-14 w-80 bg-white/95 backdrop-blur-xl rounded-2xl shadow-xl border border-black/5 z-50 overflow-hidden animate-fade-in">
+      {bildirimAcik && (
+        <div className="fixed top-20 right-4 sm:right-6 w-80 max-w-[calc(100vw-2rem)] bg-white/95 backdrop-blur-xl rounded-2xl shadow-xl border border-black/5 z-[60] overflow-hidden animate-fade-in">
               <div className="bg-gray-50/80 p-3.5 border-b border-black/5 flex justify-between items-center">
                 <h4 className="font-bold text-gray-800 text-xs">Hatırlatıcılar</h4>
-                <span className="text-[10px] bg-red-100 text-red-600 font-bold px-2 py-0.5 rounded-md">{eksikGorevler.length} Eksik</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] bg-red-100 text-red-600 font-bold px-2 py-0.5 rounded-md">{eksikGorevler.length} Eksik</span>
+                  <button
+                    onClick={() => setBildirimAcik(false)}
+                    className="w-6 h-6 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-200 cursor-pointer"
+                    aria-label="Bildirimleri kapat"
+                  >
+                    ✕
+                  </button>
+                </div>
               </div>
               <div className="max-h-72 overflow-y-auto custom-scrollbar p-2">
                 {eksikGorevler.length > 0 ? (
@@ -472,10 +472,9 @@ export default function AnaSayfa({ seciliModuller, setAktifSayfa }) {
                   </div>
                 )}
               </div>
-            </div>
-          )}
+
         </div>
-      </div>
+      )}
 
 
       {/* 2. TÜRKÇE GÜNÜN İLHAMI KARTI */}
@@ -533,12 +532,12 @@ export default function AnaSayfa({ seciliModuller, setAktifSayfa }) {
           <div className="relative z-10">
             <div className="flex justify-between items-end mb-2">
               <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">SEVİYE {level}</span>
-              <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md">{xp} / {hedefXp} XP</span>
+              <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md">{mevcutLevelXP} / 500 XP</span>
             </div>
             <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden border border-black/5 mb-4 shadow-inner">
               <div 
                 className="h-full bg-gradient-to-r from-emerald-400 to-green-500 rounded-full transition-all duration-1000 relative"
-                style={{ width: `${Math.min(100, (xp / hedefXp) * 100)}%` }}
+                style={{ width: `${Math.min(100, (mevcutLevelXP / 500) * 100)}%` }}
               >
                 <div className="absolute top-0 right-0 bottom-0 left-0 bg-white/20 animate-pulse"></div>
               </div>
