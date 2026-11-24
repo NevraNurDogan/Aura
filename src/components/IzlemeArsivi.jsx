@@ -269,8 +269,9 @@ export default function IzlemeArsivi() {
     let kategoriDetay = formData.kategoriDetay;
 
     if (!gorselUrl || !kategoriDetay) {
-      const sonuc = await detaylariVeGorseliOtomatikBul(formData.baslik.trim(), aktifSekme);
-      if (sonuc) {
+      const sonuclar = await cokluSonucGetir(formData.baslik.trim(), aktifSekme);
+      if (sonuclar && sonuclar.length > 0) {
+        const sonuc = sonuclar[0];
         if (!gorselUrl && sonuc.gorselUrl) gorselUrl = sonuc.gorselUrl;
         if (!kategoriDetay && sonuc.kategoriDetay) kategoriDetay = sonuc.kategoriDetay;
       }

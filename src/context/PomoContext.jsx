@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect, useContext } from 'react';
+import { createContext, useState, useEffect, useContext } from 'react';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db, getCurrentUserId } from '../firebase';
 
@@ -29,9 +29,11 @@ export function PomoProvider({ children }) {
     return () => clearInterval(interval);
   }, [pomoMod]);
 
-  // Süre bittiğinde bildirim gönder ve durumu değiştir
+  // Süre 0'a ulaştığında modu güncelle ve bildirim gönder
   useEffect(() => {
-    if (pomoSure === 0) {
+    if (pomoSure !== 0) return;
+
+    const timeoutId = setTimeout(() => {
       if (pomoMod === 'calisiyor') {
         setTamamlananPomo(p => p + 1);
         setPomoMod('mola_bekliyor');
@@ -51,9 +53,13 @@ export function PomoProvider({ children }) {
           });
         }
       }
-    }
-    
-    // Sekme başlığını güncelle
+    }, 0);
+
+    return () => clearTimeout(timeoutId);
+  }, [pomoSure, pomoMod]);
+
+  // Sekme başlığını güncelle
+  useEffect(() => {
     if (pomoMod === 'calisiyor' || pomoMod === 'mola') {
       const m = Math.floor(pomoSure / 60).toString().padStart(2, '0');
       const s = (pomoSure % 60).toString().padStart(2, '0');

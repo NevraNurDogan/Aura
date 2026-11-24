@@ -13,13 +13,6 @@ export default function Sosyal() {
   
   const userId = getCurrentUserId();
 
-  useEffect(() => {
-    if (userId) {
-      arkadaslariGetir();
-      istekleriGetir();
-    }
-  }, [userId]);
-
   const arkadaslariGetir = async () => {
     try {
       const userDoc = await getDoc(doc(db, 'profiles', userId));
@@ -65,6 +58,13 @@ export default function Sosyal() {
       console.error("İstekler çekilemedi", e);
     }
   };
+
+  useEffect(() => {
+    if (userId) {
+      arkadaslariGetir();
+      istekleriGetir();
+    }
+  }, [userId]);
 
   const arkadasAra = async (e) => {
     e.preventDefault();

@@ -29,13 +29,41 @@ export default function Ayarlar() {
   const [sayfaHazir, setSayfaHazir] = useState(false);
 
   const renkler = [
-    { id: 'standart', ad: 'Sade',   hex: '#f3f4f6' },
-    { id: 'bordo',   ad: 'Bordo',   hex: '#800020' },
-    { id: 'kahve',   ad: 'Kahve',   hex: '#8B4513' },
-    { id: 'yesil',   ad: 'Yeşil',   hex: '#A8E6CF' },
-    { id: 'pembe',   ad: 'Pembe',   hex: '#fbcfe8' },
-    { id: 'mor',     ad: 'Mor',     hex: '#d8b4fe' },
-    { id: 'mavi',    ad: 'Mavi',    hex: '#bfdbfe' },
+    { 
+      id: 'standart', ad: 'Sade',
+      bgColor: '#f8f8fc', sidebarColor: '#ffffff',  accentColor: '#6366f1',
+      desc: 'Temiz & Minimal'
+    },
+    { 
+      id: 'bordo',   ad: 'Kadife Gül',
+      bgColor: '#fef1f3', sidebarColor: '#fdf0f3',  accentColor: '#be123c',
+      desc: 'Romantik & Sıcak'
+    },
+    { 
+      id: 'kahve',   ad: 'Karamel',
+      bgColor: '#fdf8f3', sidebarColor: '#fdf8f3',  accentColor: '#92400e',
+      desc: 'Toprak & Derin'
+    },
+    { 
+      id: 'yesil',   ad: 'Orman',
+      bgColor: '#f0fdf6', sidebarColor: '#f0fdf6',  accentColor: '#059669',
+      desc: 'Huzurlu & Taze'
+    },
+    { 
+      id: 'pembe',   ad: 'Sakura',
+      bgColor: '#fdf2f9', sidebarColor: '#fdf2f9',  accentColor: '#db2777',
+      desc: 'Narin & Şirin'
+    },
+    { 
+      id: 'mor',     ad: 'Galaktik',
+      bgColor: '#faf4ff', sidebarColor: '#faf4ff',  accentColor: '#7c3aed',
+      desc: 'Mistik & Güçlü'
+    },
+    { 
+      id: 'mavi',    ad: 'Okyanus',
+      bgColor: '#f0f7ff', sidebarColor: '#f0f7ff',  accentColor: '#2563eb',
+      desc: 'Serin & Odaklı'
+    },
   ];
 
   useEffect(() => {
@@ -73,10 +101,7 @@ export default function Ayarlar() {
 
   const sinavToggle = (sAdi) => {
     if (seciliSinavlar.includes(sAdi)) {
-      if (seciliSinavlar.length <= 1) {
-        bildirimGoster('⚠️ En az 1 sınav seçili olmalıdır.');
-        return;
-      }
+      // Zorunlu minimum kaldırıldı — sıfır seçili olabilir
       const yeni = seciliSinavlar.filter(s => s !== sAdi);
       setSeciliSinavlar(yeni);
       localStorage.setItem('lifeos_secili_sinavlar', JSON.stringify(yeni));
@@ -200,22 +225,43 @@ export default function Ayarlar() {
           </div>
 
           <div>
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">Tema Rengi</p>
-            <div className="grid grid-cols-4 sm:grid-cols-7 gap-3">
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-4">Tema Rengi</p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
               {renkler.map((r) => (
                 <button
                   key={r.id}
                   onClick={() => setRenk(r.id)}
                   title={r.ad}
-                  className={`flex flex-col items-center gap-2 p-3 rounded-2xl transition-all border cursor-pointer ${renk === r.id ? 'border-gray-800 bg-white shadow-md scale-105' : 'border-black/5 hover:border-black/10 hover:bg-white/60'}`}
+                  className={`group flex flex-col rounded-2xl overflow-hidden border-2 transition-all cursor-pointer ${
+                    renk === r.id
+                      ? 'border-gray-800 shadow-lg scale-105'
+                      : 'border-transparent hover:border-gray-300 hover:scale-102'
+                  }`}
                 >
-                  <div
-                    className="w-8 h-8 rounded-full shadow-inner border border-black/10"
-                    style={{ backgroundColor: r.hex }}
-                  />
-                  <span className={`text-[10px] font-semibold leading-tight text-center ${renk === r.id ? 'text-gray-900' : 'text-gray-400'}`}>
-                    {r.ad}
-                  </span>
+                  {/* Tema Mini Önizleme */}
+                  <div className="relative h-16 w-full" style={{ backgroundColor: r.bgColor }}>
+                    {/* Sol kenar = sidebar rengi */}
+                    <div className="absolute left-0 top-0 bottom-0 w-5 opacity-80" style={{ backgroundColor: r.sidebarColor, borderRight: `1px solid ${r.accentColor}22` }} />
+                    {/* Minik kart */}
+                    <div className="absolute left-7 top-2 right-2 h-5 rounded-md bg-white/70 shadow-sm" />
+                    {/* Aksan nokta */}
+                    <div className="absolute left-7 bottom-2 w-4 h-4 rounded-full shadow" style={{ backgroundColor: r.accentColor }} />
+                    {/* Check mark */}
+                    {renk === r.id && (
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="w-7 h-7 rounded-full bg-white/90 flex items-center justify-center shadow-md">
+                          <span className="text-sm font-bold" style={{ color: r.accentColor }}>✓</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  {/* Alt etiket */}
+                  <div className={`px-2 py-1.5 text-center transition-colors ${
+                    renk === r.id ? 'bg-gray-900' : 'bg-gray-50 group-hover:bg-gray-100'
+                  }`}>
+                    <p className={`text-[10px] font-bold leading-tight ${ renk === r.id ? 'text-white' : 'text-gray-700' }`}>{r.ad}</p>
+                    <p className={`text-[9px] font-light leading-tight mt-0.5 ${ renk === r.id ? 'text-gray-300' : 'text-gray-400' }`}>{r.desc}</p>
+                  </div>
                 </button>
               ))}
             </div>
@@ -223,18 +269,23 @@ export default function Ayarlar() {
         </SectionCard>
 
         {/* ── Sınav tercihleri ── */}
-        <SectionCard icon="◎" title="Aktif Sınav Tercihleri" description="Sınav Takibi modülünde görünmesini istediğin sınavları işaretle.">
+        <SectionCard icon="◎" title="Aktif Sınav Tercihleri" description="Sınav Takibi modülünde görünmesini istediğin standart ve özel sınavları işaretle.">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-            {TUM_SINAVLAR.map(sAdi => {
+            {Array.from(new Set([...TUM_SINAVLAR, ...seciliSinavlar])).map(sAdi => {
               const aktif = seciliSinavlar.includes(sAdi);
+              const isOzel = !TUM_SINAVLAR.includes(sAdi);
               return (
                 <button
                   key={sAdi}
                   onClick={() => sinavToggle(sAdi)}
-                  className={`px-3 py-2.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer flex items-center justify-between gap-1 ${aktif ? 'bg-gray-900 text-white border-gray-900 shadow-sm' : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'}`}
+                  className={`px-3 py-2.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer flex items-center justify-between gap-1.5 ${
+                    aktif 
+                      ? (isOzel ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm' : 'bg-gray-900 text-white border-gray-900 shadow-sm') 
+                      : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
+                  }`}
                 >
                   <span className="truncate">{sAdi}</span>
-                  <span className="flex-shrink-0 opacity-70">{aktif ? '✓' : '+'}</span>
+                  <span className="flex-shrink-0 opacity-80 text-[11px]">{aktif ? '✓' : '+'}</span>
                 </button>
               );
             })}

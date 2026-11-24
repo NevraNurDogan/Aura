@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Aura Icon Generator</title>
+<style>
+  body { margin: 0; background: #111; display: flex; align-items: center; justify-content: center; min-height: 100vh; gap: 24px; flex-wrap: wrap; }
+  canvas { border-radius: 22%; box-shadow: 0 20px 60px rgba(99,102,241,0.4); }
+  button { color: white; background: #6366f1; border: none; padding: 12px 24px; border-radius: 12px; cursor: pointer; font-size: 14px; font-weight: bold; }
+</style>
+</head>
+<body>
+<canvas id="icon" width="1024" height="1024"></canvas>
+<script>
+const canvas = document.getElementById('icon');
+const ctx = canvas.getContext('2d');
+const w = 1024, h = 1024;
+
+// Background gradient
+const bg = ctx.createLinearGradient(0, 0, w, h);
+bg.addColorStop(0, '#1a0533');
+bg.addColorStop(0.45, '#0f0c29');
+bg.addColorStop(1, '#0d1b4b');
+ctx.fillStyle = bg;
+ctx.roundRect(0, 0, w, h, 180);
+ctx.fill();
+
+// Radial glow center
+const glow = ctx.createRadialGradient(w/2, h/2, 60, w/2, h/2, 420);
+glow.addColorStop(0, 'rgba(139,92,246,0.35)');
+glow.addColorStop(0.5, 'rgba(99,102,241,0.12)');
+glow.addColorStop(1, 'rgba(0,0,0,0)');
+ctx.fillStyle = glow;
+ctx.fillRect(0, 0, w, h);
+
+const cx = w/2, cy = h/2;
+
+// Draw outer ring
+ctx.save();
+ctx.beginPath();
+ctx.arc(cx, cy, 330, 0, Math.PI * 2);
+const ringGrad = ctx.createLinearGradient(cx-330, cy-330, cx+330, cy+330);
+ringGrad.addColorStop(0, 'rgba(167,139,250,0.9)');
+ringGrad.addColorStop(0.5, 'rgba(255,255,255,1)');
+ringGrad.addColorStop(1, 'rgba(99,102,241,0.7)');
+ctx.strokeStyle = ringGrad;
+ctx.lineWidth = 14;
+ctx.shadowColor = 'rgba(167,139,250,0.8)';
+ctx.shadowBlur = 40;
+ctx.stroke();
+ctx.restore();
+
+// Inner ring
+ctx.save();
+ctx.beginPath();
+ctx.arc(cx, cy, 220, 0, Math.PI * 2);
+const ringGrad2 = ctx.createLinearGradient(cx-220, cy-220, cx+220, cy+220);
+ringGrad2.addColorStop(0, 'rgba(255,255,255,0.5)');
+ringGrad2.addColorStop(0.5, 'rgba(196,181,253,0.9)');
+ringGrad2.addColorStop(1, 'rgba(129,140,248,0.6)');
+ctx.strokeStyle = ringGrad2;
+ctx.lineWidth = 8;
+ctx.shadowColor = 'rgba(196,181,253,0.7)';
+ctx.shadowBlur = 30;
+ctx.stroke();
+ctx.restore();
+
+// Letter A - elegant serif style
+ctx.save();
+ctx.shadowColor = 'rgba(255,255,255,0.9)';
+ctx.shadowBlur = 50;
+
+const aGrad = ctx.createLinearGradient(cx-80, cy-160, cx+80, cy+160);
+aGrad.addColorStop(0, '#ffffff');
+aGrad.addColorStop(0.3, '#ddd6fe');
+aGrad.addColorStop(0.7, '#c4b5fd');
+aGrad.addColorStop(1, '#a78bfa');
+
+ctx.fillStyle = aGrad;
+ctx.font = 'bold 420px Georgia, serif';
+ctx.textAlign = 'center';
+ctx.textBaseline = 'middle';
+ctx.fillText('A', cx, cy + 20);
+ctx.restore();
+
+// Sparkle stars
+const stars = [
+  [cx+310, cy-80, 16], [cx-290, cy-120, 12], [cx+100, cy-330, 10],
+  [cx-150, cy+300, 14], [cx+260, cy+200, 8], [cx-200, cy-280, 10],
+  [cx+340, cy+150, 6]
+];
+
+stars.forEach(([sx, sy, size]) => {
+  ctx.save();
+  ctx.fillStyle = 'rgba(255,255,255,0.9)';
+  ctx.shadowColor = 'rgba(255,255,255,0.8)';
+  ctx.shadowBlur = 15;
+  // 4-pointed star
+  ctx.beginPath();
+  for (let i = 0; i < 8; i++) {
+    const angle = (i * Math.PI) / 4 - Math.PI/8;
+    const r = i % 2 === 0 ? size : size * 0.35;
+    const px = sx + r * Math.cos(angle);
+    const py = sy + r * Math.sin(angle);
+    i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+});
+
+// Bottom text: AURA (subtle)
+ctx.save();
+ctx.fillStyle = 'rgba(196,181,253,0.4)';
+ctx.font = '500 64px -apple-system, system-ui, sans-serif';
+ctx.textAlign = 'center';
+ctx.letterSpacing = '0.4em';
+ctx.fillText('AURA', cx, h - 100);
+ctx.restore();
+
+// Download button
+const btn = document.createElement('button');
+btn.textContent = '⬇ PNG İndir (1024x1024)';
+btn.style.position = 'fixed';
+btn.style.bottom = '24px';
+btn.style.right = '24px';
+btn.style.zIndex = '99';
+btn.addEventListener('click', () => {
+  const link = document.createElement('a');
+  link.download = 'aura-icon-1024.png';
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+});
+document.body.appendChild(btn);
+
+console.log('Icon rendered! Click the download button.');
+</script>
+</body>
+</html>

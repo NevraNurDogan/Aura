@@ -220,9 +220,28 @@ export default function SinavTakibi() {
     return cached ? JSON.parse(cached) : ['TYT', 'AYT'];
   });
 
-  const [aktifSinav, setAktifSinav] = useState('TYT');
+  const [aktifSinav, setAktifSinav] = useState(() => {
+    const cached = localStorage.getItem('lifeos_secili_sinavlar');
+    const list = cached ? JSON.parse(cached) : ['TYT', 'AYT'];
+    return list.length > 0 ? list[0] : '';
+  });
   const [sinavYonetenPanelAcik, setSinavYonetenPanelAcik] = useState(false);
   const [yeniOzelSinavAdi, setYeniOzelSinavAdi] = useState('');
+  const [tumOzelSinavlar, setTumOzelSinavlar] = useState(() => {
+    try {
+      const cachedOzel = localStorage.getItem('lifeos_ozel_sinavlar');
+      const ozelList = cachedOzel ? JSON.parse(cachedOzel) : [];
+      const cachedSecili = localStorage.getItem('lifeos_secili_sinavlar');
+      const seciliList = cachedSecili ? JSON.parse(cachedSecili) : ['TYT', 'AYT'];
+      const standartKeys = Object.keys(OSYM_MUFREDATI);
+      const mevcutOzel = seciliList.filter(s => !standartKeys.includes(s));
+      return Array.from(new Set([...ozelList, ...mevcutOzel]));
+    } catch {
+      return [];
+    }
+  });
+  const [duzenlenenSinavAd, setDuzenlenenSinavAd] = useState(null);
+  const [duzenlenenYeniIsim, setDuzenlenenYeniIsim] = useState('');
 
   const [konular, setKonular] = useState([]);
   const [aktifDers, setAktifDers] = useState('');
@@ -360,18 +379,17 @@ export default function SinavTakibi() {
   }, [aktifSinav]);
 
   const sinavToggle = (sinavAdi) => {
-    let yeniSecim = [];
+    let yeniSecim;
     if (seciliSinavTurleri.includes(sinavAdi)) {
-      if (seciliSinavTurleri.length === 1) {
-        alert("En az 1 aktif sınav seçili olmalıdır.");
-        return;
-      }
       yeniSecim = seciliSinavTurleri.filter(s => s !== sinavAdi);
     } else {
       yeniSecim = [...seciliSinavTurleri, sinavAdi];
     }
     setSeciliSinavTurleri(yeniSecim);
-    if (!yeniSecim.includes(aktifSinav)) {
+    localStorage.setItem('lifeos_secili_sinavlar', JSON.stringify(yeniSecim));
+    if (yeniSecim.length === 0) {
+      setAktifSinav('');
+    } else if (!yeniSecim.includes(aktifSinav)) {
       setAktifSinav(yeniSecim[0]);
     }
   };
@@ -379,12 +397,56 @@ export default function SinavTakibi() {
   const ozelSinavEkle = () => {
     if (!yeniOzelSinavAdi.trim()) return;
     const ad = yeniOzelSinavAdi.trim();
+    if (!tumOzelSinavlar.includes(ad)) {
+      const guncelOzel = [...tumOzelSinavlar, ad];
+      setTumOzelSinavlar(guncelOzel);
+      localStorage.setItem('lifeos_ozel_sinavlar', JSON.stringify(guncelOzel));
+    }
     if (!seciliSinavTurleri.includes(ad)) {
-      setSeciliSinavTurleri(prev => [...prev, ad]);
+      const guncelSecili = [...seciliSinavTurleri, ad];
+      setSeciliSinavTurleri(guncelSecili);
+      localStorage.setItem('lifeos_secili_sinavlar', JSON.stringify(guncelSecili));
     }
     setAktifSinav(ad);
     setAktifDers('Genel');
     setYeniOzelSinavAdi('');
+  };
+
+  const ozelSinavSil = (silinecekAd) => {
+    if (!window.confirm(`"${silinecekAd}" sınavını silmek istediğinize emin misiniz?`)) return;
+    const guncelOzel = tumOzelSinavlar.filter(s => s !== silinecekAd);
+    setTumOzelSinavlar(guncelOzel);
+    localStorage.setItem('lifeos_ozel_sinavlar', JSON.stringify(guncelOzel));
+
+    const guncelSecili = seciliSinavTurleri.filter(s => s !== silinecekAd);
+    setSeciliSinavTurleri(guncelSecili);
+    localStorage.setItem('lifeos_secili_sinavlar', JSON.stringify(guncelSecili));
+
+    if (aktifSinav === silinecekAd) {
+      setAktifSinav(guncelSecili.length > 0 ? guncelSecili[0] : '');
+    }
+  };
+
+  const ozelSinavDuzenleKaydet = (eskiAd) => {
+    const yeniAd = duzenlenenYeniIsim.trim();
+    if (!yeniAd || yeniAd === eskiAd) {
+      setDuzenlenenSinavAd(null);
+      setDuzenlenenYeniIsim('');
+      return;
+    }
+    const guncelOzel = tumOzelSinavlar.map(s => s === eskiAd ? yeniAd : s);
+    setTumOzelSinavlar(guncelOzel);
+    localStorage.setItem('lifeos_ozel_sinavlar', JSON.stringify(guncelOzel));
+
+    const guncelSecili = seciliSinavTurleri.map(s => s === eskiAd ? yeniAd : s);
+    setSeciliSinavTurleri(guncelSecili);
+    localStorage.setItem('lifeos_secili_sinavlar', JSON.stringify(guncelSecili));
+
+    if (aktifSinav === eskiAd) {
+      setAktifSinav(yeniAd);
+    }
+    setDuzenlenenSinavAd(null);
+    setDuzenlenenYeniIsim('');
   };
 
   const konuEkle = async () => { 
@@ -609,40 +671,109 @@ export default function SinavTakibi() {
 
           {/* AKTİF SINAV SEÇİM PANELİ (POPUP) */}
           {sinavYonetenPanelAcik && (
-            <div className="absolute right-0 top-12 w-80 bg-white/95 backdrop-blur-xl rounded-3xl p-5 shadow-xl border border-black/5 z-50 animate-fade-in space-y-3">
+            <div className="absolute right-0 top-12 w-84 sm:w-92 bg-white/95 backdrop-blur-2xl rounded-3xl p-5 shadow-2xl border border-black/10 z-50 animate-fade-in space-y-4">
               <div className="flex justify-between items-center border-b border-black/5 pb-2">
-                <h4 className="font-bold text-gray-800 text-xs">Takip Edilecek Sınavlar</h4>
-                <button onClick={() => setSinavYonetenPanelAcik(false)} className="text-gray-400 hover:text-gray-700 text-xs p-1 cursor-pointer">✕</button>
-              </div>
-              <p className="text-[11px] text-gray-400 font-light">Sayfanızda yalnızca işaretlediğiniz sınavlar görünür. Tüm müfredatlar saklı tutulur.</p>
-
-              <div className="flex flex-col gap-2 max-h-48 overflow-y-auto custom-scrollbar pr-1">
-                {Object.keys(OSYM_MUFREDATI).map(sAdi => {
-                  const secili = seciliSinavTurleri.includes(sAdi);
-                  return (
-                    <label key={sAdi} className="flex items-center justify-between p-2 rounded-xl hover:bg-gray-50 transition cursor-pointer text-xs font-semibold text-gray-800 border border-transparent hover:border-black/5">
-                      <span>{sAdi}</span>
-                      <input 
-                        type="checkbox" 
-                        checked={secili} 
-                        onChange={() => sinavToggle(sAdi)} 
-                        className="w-4 h-4 text-blue-600 rounded cursor-pointer"
-                      />
-                    </label>
-                  );
-                })}
+                <div>
+                  <h4 className="font-bold text-gray-900 text-xs">Sınav Tercihlerim</h4>
+                  <p className="text-[10px] text-gray-400 font-light">Aktif sınavları belirleyin veya yenilerini ekleyin</p>
+                </div>
+                <button onClick={() => setSinavYonetenPanelAcik(false)} className="text-gray-400 hover:text-gray-700 text-xs p-1.5 rounded-lg hover:bg-black/5 cursor-pointer">✕</button>
               </div>
 
-              <div className="pt-2 border-t border-black/5 flex gap-1.5">
-                <input 
-                  type="text" 
-                  placeholder="Özel Sınav (TUS, DUS)" 
-                  value={yeniOzelSinavAdi}
-                  onChange={(e) => setYeniOzelSinavAdi(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && ozelSinavEkle()}
-                  className="flex-1 p-2 bg-gray-50 border border-gray-200 rounded-xl text-xs"
-                />
-                <button onClick={ozelSinavEkle} className="px-3 py-2 bg-gray-900 text-white rounded-xl text-xs font-bold hover:bg-black cursor-pointer">Ekle</button>
+              {/* ÖZEL / KULLANICININ EKLEDİĞİ SINAVLAR */}
+              {tumOzelSinavlar.length > 0 && (
+                <div className="space-y-1.5">
+                  <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider">Kendi Eklediğin Sınavlar</p>
+                  <div className="flex flex-col gap-1.5 max-h-36 overflow-y-auto custom-scrollbar pr-1">
+                    {tumOzelSinavlar.map(sAdi => {
+                      const secili = seciliSinavTurleri.includes(sAdi);
+                      const isEditing = duzenlenenSinavAd === sAdi;
+                      return (
+                        <div key={sAdi} className="flex items-center justify-between p-2 rounded-xl bg-indigo-50/50 hover:bg-indigo-50/80 border border-indigo-100/60 transition text-xs">
+                          {isEditing ? (
+                            <div className="flex items-center gap-1.5 flex-1">
+                              <input
+                                type="text"
+                                value={duzenlenenYeniIsim}
+                                onChange={(e) => setDuzenlenenYeniIsim(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && ozelSinavDuzenleKaydet(sAdi)}
+                                autoFocus
+                                className="flex-1 px-2 py-1 bg-white border border-indigo-300 rounded-lg text-xs text-gray-900"
+                              />
+                              <button onClick={() => ozelSinavDuzenleKaydet(sAdi)} className="text-[10px] font-bold text-emerald-700 px-2 py-1 rounded bg-emerald-100 hover:bg-emerald-200 cursor-pointer">Kaydet</button>
+                              <button onClick={() => { setDuzenlenenSinavAd(null); setDuzenlenenYeniIsim(''); }} className="text-[10px] text-gray-500 px-1.5 py-1 hover:text-gray-700 cursor-pointer">İptal</button>
+                            </div>
+                          ) : (
+                            <>
+                              <label className="flex items-center gap-2 flex-1 cursor-pointer truncate mr-2">
+                                <input 
+                                  type="checkbox" 
+                                  checked={secili} 
+                                  onChange={() => sinavToggle(sAdi)} 
+                                  className="w-4 h-4 text-indigo-600 rounded cursor-pointer"
+                                />
+                                <span className={`font-semibold truncate ${secili ? 'text-gray-900' : 'text-gray-400 line-through'}`}>{sAdi}</span>
+                              </label>
+                              <div className="flex items-center gap-1 shrink-0">
+                                <button 
+                                  onClick={() => { setDuzenlenenSinavAd(sAdi); setDuzenlenenYeniIsim(sAdi); }} 
+                                  title="Adı Değiştir"
+                                  className="p-1 text-gray-400 hover:text-indigo-600 rounded hover:bg-white cursor-pointer text-xs transition"
+                                >
+                                  ✏️
+                                </button>
+                                <button 
+                                  onClick={() => ozelSinavSil(sAdi)} 
+                                  title="Sınavı Sil"
+                                  className="p-1 text-gray-400 hover:text-rose-600 rounded hover:bg-white cursor-pointer text-xs transition"
+                                >
+                                  🗑️
+                                </button>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* STANDART ÖSYM LİSTESİ */}
+              <div className="space-y-1.5">
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Standart Sınavlar</p>
+                <div className="flex flex-col gap-1 max-h-36 overflow-y-auto custom-scrollbar pr-1">
+                  {Object.keys(OSYM_MUFREDATI).map(sAdi => {
+                    const secili = seciliSinavTurleri.includes(sAdi);
+                    return (
+                      <label key={sAdi} className="flex items-center justify-between p-2 rounded-xl hover:bg-gray-50 transition cursor-pointer text-xs font-semibold text-gray-800 border border-transparent hover:border-black/5">
+                        <span>{sAdi}</span>
+                        <input 
+                          type="checkbox" 
+                          checked={secili} 
+                          onChange={() => sinavToggle(sAdi)} 
+                          className="w-4 h-4 text-indigo-600 rounded cursor-pointer"
+                        />
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* YENİ ÖZEL SINAV EKLE */}
+              <div className="pt-2 border-t border-black/5 space-y-1.5">
+                <p className="text-[10px] font-medium text-gray-400">Yeni Sınav veya Ders Ekle:</p>
+                <div className="flex gap-1.5">
+                  <input 
+                    type="text" 
+                    placeholder="Örn: Vize, Final, Komite..." 
+                    value={yeniOzelSinavAdi}
+                    onChange={(e) => setYeniOzelSinavAdi(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && ozelSinavEkle()}
+                    className="flex-1 p-2 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                  />
+                  <button onClick={ozelSinavEkle} className="px-3.5 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 cursor-pointer transition shadow-xs">Ekle</button>
+                </div>
               </div>
             </div>
           )}

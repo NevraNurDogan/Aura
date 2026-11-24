@@ -4,7 +4,7 @@ import { db, getCurrentUserId } from '../firebase';
 
 export default function DonguTakibi() {
   const [donguler, setDonguler] = useState([]);
-  const [orucBorcu, setOrucBorcu] = useState(() => parseInt(localStorage.getItem('lifeos_oruc_borcu') || '12'));
+  const [orucBorcu, setOrucBorcu] = useState(() => parseInt(localStorage.getItem('lifeos_oruc_borcu') || '0'));
   const [tarih, setTarih] = useState(new Date());
   
   const yil = tarih.getFullYear();
@@ -282,19 +282,20 @@ export default function DonguTakibi() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="md:col-span-2 bg-gradient-to-r from-rose-400 to-pink-500 text-white p-6 sm:p-7 rounded-[2rem] shadow-sm flex flex-col justify-center relative overflow-hidden">
-          <div className="absolute -right-4 -top-4 w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
-          <div className="absolute right-20 -bottom-10 w-24 h-24 bg-rose-600/20 rounded-full blur-xl"></div>
+        <div className="dongu-hero-card md:col-span-2 text-white p-6 sm:p-7 rounded-[2rem] shadow-sm flex flex-col justify-center relative overflow-hidden">
+          {/* Yumuşak ışık efektleri — inline stil ile asla siyah lekeye dönüşmez */}
+          <div className="pointer-events-none absolute -right-6 -top-6 w-36 h-36 rounded-full blur-2xl opacity-25" style={{ background: 'radial-gradient(circle, #ffffff 0%, transparent 70%)' }}></div>
+          <div className="pointer-events-none absolute right-16 -bottom-10 w-28 h-28 rounded-full blur-xl opacity-20" style={{ background: 'radial-gradient(circle, #fda4af 0%, transparent 70%)' }}></div>
           
           <div className="relative z-10 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
-              <div className="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider mb-3 bg-white/20 border border-white/30 backdrop-blur-md">
+              <div className="dongu-badge inline-flex items-center px-3.5 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider mb-3">
                 {isReglDonemi ? '🩸 Regl Dönemindesin' : '✨ Temiz Dönem'}
               </div>
-              <h3 className="text-3xl sm:text-4xl font-serif font-bold">
+              <h3 className="text-3xl sm:text-4xl font-serif font-bold text-white tracking-tight">
                 {sonrakiTahminTarih !== "-" ? sonrakiTahminTarih.split('-').reverse().join(' ') : "Henüz kayıt yok"}
               </h3>
-              <p className="text-xs sm:text-sm font-medium opacity-90 mt-1">
+              <p className="text-xs sm:text-sm font-medium text-rose-50/90 mt-1">
                 {kalanGun !== null 
                   ? (kalanGun > 0 ? `Sıradaki tahmini regl tarihine ${kalanGun} gün kaldı.` : (kalanGun === 0 ? "Beklenen tarih bugün!" : `Tahmini tarih ${Math.abs(kalanGun)} gün geçti, her an başlayabilir.`))
                   : "Takvimden bir güne tıklayarak 'Başlangıç' işaretleyin."}
