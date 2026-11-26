@@ -62,8 +62,9 @@
 
 ### Gereksinimler
 
-- Node.js 18+
+- Node.js 22+
 - npm 9+
+- Firebase CLI (`npm install -g firebase-tools`)
 - Firebase projesi
 
 ### Adımlar
@@ -96,9 +97,13 @@ npm run dev
 
 ## 🔒 Güvenlik
 
-- API anahtarları `.env` dosyasında saklanır ve **asla commit edilmez**
-- `.env` dosyası `.gitignore`'a eklenmiştir
-- Döngü takibi verileri tamamen kişiseldir ve Firestore güvenlik kurallarıyla korunur
+- `VITE_` ile başlayan değerler ve Firebase istemci API anahtarı web derlemesinde görünür; bunları servis sırrı olarak kullanmayın. Firebase istemci API anahtarı için Google Cloud Console'da API ve uygulama kısıtlamaları kullanın.
+- TMDB aramaları tarayıcıdan doğrudan yapılır; `VITE_TMDB_API_KEY` değerini yerel `.env` dosyasında tanımlayın. Bu anahtar derlenen istemci kodunda görünür ve gizli bir sunucu sırrı değildir.
+- `.env` dosyası repoya eklenmemelidir. Bir anahtar sızarsa sağlayıcıdan iptal edip yenileyin; kaynak koddan silmek tek başına yeterli değildir.
+- Firestore'da özel kullanıcı belgeleri yalnızca belge sahibine açıktır. Sosyal özellikler için gereken sınırlı alanlar `public_profiles` belgelerinde tutulur.
+- Döngü takibi verileri Firestore güvenlik kurallarıyla korunur.
+
+Önceden `profiles` koleksiyonunda bulunan kullanıcılar, sosyal özellikleri kullandıkça sınırlı `public_profiles` kaydı otomatik oluşturulur; e-posta ve arkadaş listesi bu kayda kopyalanmaz.
 
 ---
 

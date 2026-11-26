@@ -774,12 +774,11 @@ function App() {
           {aktifSayfa === 'maneviyat' && <Maneviyat />}
           {aktifSayfa === 'istatistikler' && <Istatistikler />}
           {aktifSayfa === 'sosyal' && <Sosyal />}
-        </Suspense>
 
-        {aktifSayfa === 'ayarlar' && (
-          <div className="flex flex-col gap-8 max-w-2xl mx-auto">
-            <Ayarlar />
-            <div className="animate-fade-in bg-white/70 backdrop-blur-xl overflow-hidden rounded-[2rem] border border-black/5 shadow-sm">
+          {aktifSayfa === 'ayarlar' && (
+            <div className="flex flex-col gap-8 max-w-2xl mx-auto">
+              <Ayarlar />
+              <div className="animate-fade-in bg-white/70 backdrop-blur-xl overflow-hidden rounded-[2rem] border border-black/5 shadow-sm">
               <div className="px-6 sm:px-8 pt-6 pb-5 border-b border-black/5 flex items-start gap-4">
                 <div className="w-10 h-10 rounded-2xl bg-gray-50 border border-black/5 flex items-center justify-center text-xl flex-shrink-0">
                   ◫
@@ -807,9 +806,10 @@ function App() {
                   </div>
                 ))}
               </div>
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </Suspense>
       </main>
 
     </div>

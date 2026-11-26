@@ -2,7 +2,23 @@ import { useState, useEffect } from 'react';
 import { collection, query, where, getDocs, addDoc, updateDoc, doc, deleteDoc, setDoc } from 'firebase/firestore';
 import { db, getCurrentUserId } from '../firebase';
 
-const VARSAYILAN_ARSIV = [];
+const tmdbAra = async (type, query) => {
+  const apiKey = import.meta.env.VITE_TMDB_API_KEY;
+  if (!apiKey) throw new Error('VITE_TMDB_API_KEY ortam değişkeni tanımlı değil.');
+
+  const params = new URLSearchParams({
+    api_key: apiKey,
+    language: 'tr-TR',
+    query
+  });
+  const response = await fetch(`https://api.themoviedb.org/3/search/${type}?${params}`);
+
+  if (!response.ok) {
+    throw new Error(`TMDB araması başarısız oldu (${response.status}).`);
+  }
+
+  return response.json();
+};
 
 export default function IzlemeArsivi() {
   const [arsiv, setArsiv] = useState([]);
@@ -83,20 +99,17 @@ export default function IzlemeArsivi() {
     if (tur === 'Dizi') {
       // 1. Önce TMDB (Türkçe diziler için en iyisi)
       try {
-        const tmdbRes = await fetch(`https://api.themoviedb.org/3/search/tv?api_key=15d2ea6d0dc1d476efbca3eba2b9bbfb&language=tr-TR&query=${encodeURIComponent(baslik)}`);
-        if (tmdbRes.ok) {
-          const tmdbData = await tmdbRes.json();
-          if (tmdbData.results && tmdbData.results.length > 0) {
-            tmdbData.results.slice(0, 5).forEach(show => {
-              let resim = show.poster_path ? `https://image.tmdb.org/t/p/w500${show.poster_path}` : '';
-              sonuclar.push({
-                baslik: show.name || baslik,
-                gorselUrl: resim,
-                kategoriDetay: 'TMDB', 
-                yil: show.first_air_date ? show.first_air_date.substring(0,4) : ''
-              });
+        const tmdbData = await tmdbAra('tv', baslik);
+        if (tmdbData.results && tmdbData.results.length > 0) {
+          tmdbData.results.slice(0, 5).forEach(show => {
+            let resim = show.poster_path ? `https://image.tmdb.org/t/p/w500${show.poster_path}` : '';
+            sonuclar.push({
+              baslik: show.name || baslik,
+              gorselUrl: resim,
+              kategoriDetay: 'TMDB',
+              yil: show.first_air_date ? show.first_air_date.substring(0,4) : ''
             });
-          }
+          });
         }
       } catch (e) { console.warn("TMDB Dizi hatası:", e); }
 
@@ -131,42 +144,19 @@ export default function IzlemeArsivi() {
     if (tur === 'Film') {
       // 1. Önce TMDB (Türkçe filmler ve daha iyi afişler)
       try {
-        const tmdbRes = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=15d2ea6d0dc1d476efbca3eba2b9bbfb&language=tr-TR&query=${encodeURIComponent(baslik)}`);
-        if (tmdbRes.ok) {
-          const tmdbData = await tmdbRes.json();
-          if (tmdbData.results && tmdbData.results.length > 0) {
-            tmdbData.results.slice(0, 5).forEach(movie => {
-              let resim = movie.poster_path ? `https://image.tmdb.org/t/p/w500${movie.poster_path}` : '';
-              sonuclar.push({
-                baslik: movie.title || baslik,
-                gorselUrl: resim,
-                kategoriDetay: 'TMDB',
-                yil: movie.release_date ? movie.release_date.substring(0,4) : ''
-              });
+        const tmdbData = await tmdbAra('movie', baslik);
+        if (tmdbData.results && tmdbData.results.length > 0) {
+          tmdbData.results.slice(0, 5).forEach(movie => {
+            let resim = movie.poster_path ? `https://image.tmdb.org/t/p/w500${movie.poster_path}` : '';
+            sonuclar.push({
+              baslik: movie.title || baslik,
+              gorselUrl: resim,
+              kategoriDetay: 'TMDB',
+              yil: movie.release_date ? movie.release_date.substring(0,4) : ''
             });
-          }
+          });
         }
       } catch (e) { console.warn("TMDB Film hatası:", e); }
-
-      // 2. OMDB ile destekle
-      if (sonuclar.length < 3) {
-        try {
-          const omdbRes = await fetch(`https://www.omdbapi.com/?apikey=trilogy&s=${encodeURIComponent(baslik)}&type=movie`);
-          const omdbData = await omdbRes.json();
-          
-          if (omdbData.Response === "True" && omdbData.Search) {
-            for (let m of omdbData.Search.slice(0, 5)) {
-               sonuclar.push({
-                 imdbID: m.imdbID,
-                 baslik: m.Title,
-                 gorselUrl: m.Poster !== "N/A" ? m.Poster : '',
-                 kategoriDetay: 'Yönetmen/Tür detayları seçince yüklenecek...',
-                 yil: m.Year
-               });
-            }
-          }
-        } catch (e) { console.warn("OMDB Film API hatası:", e); }
-      }
     }
 
     // Tekrar edenleri temizle
@@ -204,18 +194,8 @@ export default function IzlemeArsivi() {
     setOtomatikAramaYukleniyor(false);
   };
 
-  const sonucSec = async (sonuc) => {
-    // Film ise ekstra detay çekelim (OMDB'den geliyorsa imdbID vardır, TMDB'den geliyorsa kategoriDetay 'TMDB' dir)
-    if (aktifSekme === 'Film' && sonuc.imdbID) {
-      setAramaSonucuMesaj("🔎 Film detayları alınıyor...");
-      try {
-        const detailRes = await fetch(`https://www.omdbapi.com/?apikey=trilogy&i=${sonuc.imdbID}`);
-        const detail = await detailRes.json();
-        let yazar = detail.Director !== "N/A" ? detail.Director : '';
-        let kat = detail.Genre !== "N/A" ? detail.Genre : '';
-        sonuc.kategoriDetay = (yazar && kat) ? `${yazar} • ${kat}` : (yazar || kat || '');
-      } catch(e) {}
-    } else if (sonuc.kategoriDetay === 'TMDB') {
+  const sonucSec = (sonuc) => {
+    if (sonuc.kategoriDetay === 'TMDB') {
       sonuc.kategoriDetay = 'Bilgiler TMDB üzerinden sağlandı.';
     }
 
@@ -231,21 +211,31 @@ export default function IzlemeArsivi() {
 
   const userId = getCurrentUserId();
 
-  const verileriGetir = async () => {
-    let hamData = [];
-    try {
-      const q = query(collection(db, 'media_archive'), where('userId', '==', userId));
-      const snap = await getDocs(q);
-      hamData = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    } catch (error) { console.warn("Firebase arşivi çekilemedi."); }
-
-    setArsiv(hamData);
-    localStorage.setItem('lifeos_izlemearsivleri_cache', JSON.stringify(hamData));
-  };
-
   useEffect(() => {
+    let isCurrent = true;
+
+    const verileriGetir = async () => {
+      try {
+        const q = query(collection(db, 'media_archive'), where('userId', '==', userId));
+        const snap = await getDocs(q);
+        const hamData = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+        if (!isCurrent) return;
+        setArsiv(hamData);
+        localStorage.setItem('lifeos_izlemearsivleri_cache', JSON.stringify(hamData));
+      } catch (error) {
+        if (!isCurrent) return;
+        console.warn("Firebase arşivi çekilemedi.", error);
+        setArsiv([]);
+        localStorage.setItem('lifeos_izlemearsivleri_cache', JSON.stringify([]));
+      }
+    };
+
     verileriGetir();
-  }, []);
+    return () => {
+      isCurrent = false;
+    };
+  }, [userId]);
 
   const arsivKaydetLocal = (yeniArsiv) => {
     setArsiv(yeniArsiv);

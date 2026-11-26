@@ -1,6 +1,6 @@
 import { createContext, useState, useEffect, useContext } from 'react';
 import { doc, updateDoc } from 'firebase/firestore';
-import { db, getCurrentUserId } from '../firebase';
+import { db, getCurrentUserId, updatePublicProfile } from '../firebase';
 
 const PomoContext = createContext();
 
@@ -75,10 +75,14 @@ export function PomoProvider({ children }) {
       const userId = getCurrentUserId();
       if (!userId) return;
       try {
-        await updateDoc(doc(db, 'profiles', userId), {
+        const studyStatus = {
           isStudying: pomoMod === 'calisiyor',
           studySubject: pomoMod === 'calisiyor' ? aktifSinav : null
-        });
+        };
+        await Promise.all([
+          updateDoc(doc(db, 'profiles', userId), studyStatus),
+          updatePublicProfile(userId, studyStatus)
+        ]);
       } catch (e) {
         // Hata durumunu yoksay, profil henüz oluşmamış olabilir
       }

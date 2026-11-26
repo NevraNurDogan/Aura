@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getFirestore, enableIndexedDbPersistence } from "firebase/firestore";
+import { doc, getFirestore, enableIndexedDbPersistence, setDoc } from "firebase/firestore";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
 
 const firebaseConfig = {
@@ -24,6 +24,19 @@ enableIndexedDbPersistence(db).catch((err) => {
 });
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
+
+export const updatePublicProfile = (userId, profile) => {
+  const publicFields = ['isim', 'avatarUrl', 'xp', 'level', 'kazanilanRozetler', 'isStudying', 'studySubject'];
+  const publicProfile = {};
+
+  publicFields.forEach((field) => {
+    if (Object.prototype.hasOwnProperty.call(profile, field)) {
+      publicProfile[field] = profile[field];
+    }
+  });
+
+  return setDoc(doc(db, 'public_profiles', userId), publicProfile, { merge: true });
+};
 
 // Mevcut kullanıcı ID'sini getiren yardımcı fonksiyon
 // (App.jsx tarafında giriş yapıldığında bu değer localStorage'a yazılacak)

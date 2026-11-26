@@ -12,17 +12,72 @@ service cloud.firestore {
       );
     }
 
-    // Profiles can be read by any authenticated user for search/friends list
+    function hasPendingIncomingFriendRequest(profileUserId) {
+      let requestPath = /databases/$(database)/documents/friend_requests/$(profileUserId + '_' + request.auth.uid);
+      return exists(requestPath)
+        && get(requestPath).data.from == profileUserId
+        && get(requestPath).data.to == request.auth.uid
+        && get(requestPath).data.status == 'pending';
+    }
+
+    function onlyAddsCurrentUserFriend() {
+      return request.resource.data.keys().hasAny(['friends'])
+        && request.resource.data.friends is list
+        && (
+          !resource.data.keys().hasAny(['friends'])
+            ? request.resource.data.friends.hasOnly([request.auth.uid])
+            : resource.data.friends is list
+              && request.resource.data.friends.hasAll(resource.data.friends)
+              && request.resource.data.friends.hasOnly(resource.data.friends + [request.auth.uid])
+        );
+    }
+
+    function validPublicProfile() {
+      let data = request.resource.data;
+      return data.keys().hasOnly([
+          'isim', 'avatarUrl', 'xp', 'level', 'kazanilanRozetler', 'isStudying', 'studySubject'
+        ])
+        && (!data.keys().hasAny(['isim']) || (data.isim is string && data.isim.size() <= 100))
+        && (!data.keys().hasAny(['avatarUrl']) || (data.avatarUrl is string && data.avatarUrl.size() <= 250000))
+        && (!data.keys().hasAny(['xp']) || data.xp is int)
+        && (!data.keys().hasAny(['level']) || data.level is int)
+        && (!data.keys().hasAny(['kazanilanRozetler']) || (data.kazanilanRozetler is string && data.kazanilanRozetler.size() <= 500))
+        && (!data.keys().hasAny(['isStudying']) || data.isStudying is bool)
+        && (!data.keys().hasAny(['studySubject']) || data.studySubject == null || data.studySubject is string);
+    }
+
     match /profiles/{userId} {
-      allow read: if request.auth != null;
-      allow update: if request.auth != null && (request.auth.uid == userId || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['friends']));
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow update: if request.auth != null && (
+        request.auth.uid == userId ||
+        (
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['friends'])
+          && onlyAddsCurrentUserFriend()
+          && hasPendingIncomingFriendRequest(userId)
+        )
+      );
       allow create, delete: if request.auth != null && request.auth.uid == userId;
     }
-    
-    // Friend Requests: Sadece gönderen oluşturabilir, sadece taraflar okuyup silebilir
+
+    match /public_profiles/{userId} {
+      allow read: if request.auth != null;
+      allow create, update: if request.auth != null
+        && request.auth.uid == userId
+        && validPublicProfile();
+      allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+
     match /friend_requests/{requestId} {
-      allow create: if request.auth != null && request.resource.data.from == request.auth.uid;
-      allow read, delete, update: if request.auth != null && (
+      allow create: if request.auth != null
+        && requestId == request.auth.uid + '_' + request.resource.data.to
+        && request.resource.data.keys().hasOnly(['from', 'to', 'status', 'createdAt'])
+        && request.resource.data.keys().hasAll(['from', 'to', 'status', 'createdAt'])
+        && request.resource.data.from == request.auth.uid
+        && request.resource.data.to is string
+        && request.resource.data.to != request.auth.uid
+        && request.resource.data.status == 'pending'
+        && exists(/databases/$(database)/documents/public_profiles/$(request.resource.data.to));
+      allow read, delete: if request.auth != null && (
         resource.data.from == request.auth.uid || resource.data.to == request.auth.uid
       );
     }

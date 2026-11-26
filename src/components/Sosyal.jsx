@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { collection, query, getDocs, doc, getDoc, updateDoc, arrayUnion, setDoc, deleteDoc, where } from 'firebase/firestore';
-import { db, getCurrentUserId } from '../firebase';
+import { collection, query, getDocs, doc, getDoc, arrayUnion, setDoc, deleteDoc, where, writeBatch } from 'firebase/firestore';
+import { db, getCurrentUserId, updatePublicProfile } from '../firebase';
 
 export default function Sosyal() {
   const [arkadaslar, setArkadaslar] = useState([]);
@@ -19,12 +19,17 @@ export default function Sosyal() {
       if (userDoc.exists()) {
         const userData = userDoc.data();
         setKullaniciVerisi({ id: userDoc.id, ...userData });
+        try {
+          await updatePublicProfile(userId, userData);
+        } catch (error) {
+          console.error("Herkese açık profil eşitlenemedi", error);
+        }
         
         const friendIds = userData.friends || [];
         if (friendIds.length > 0) {
           const friendData = [];
           for (let fid of friendIds) {
-            const fDoc = await getDoc(doc(db, 'profiles', fid));
+            const fDoc = await getDoc(doc(db, 'public_profiles', fid));
             if (fDoc.exists()) {
               friendData.push({ id: fDoc.id, ...fDoc.data() });
             }
@@ -44,7 +49,7 @@ export default function Sosyal() {
       const gelenData = [];
       for (let d of snapGelen.docs) {
         const reqData = d.data();
-        const fDoc = await getDoc(doc(db, 'profiles', reqData.from));
+        const fDoc = await getDoc(doc(db, 'public_profiles', reqData.from));
         if (fDoc.exists()) {
           gelenData.push({ reqId: d.id, ...fDoc.data(), ...reqData });
         }
@@ -72,7 +77,7 @@ export default function Sosyal() {
     setLoading(true);
     setAramaSonucu(null);
     try {
-      const q = query(collection(db, 'profiles'));
+      const q = query(collection(db, 'public_profiles'));
       const snapshot = await getDocs(q);
       
       let sonuclar = [];
@@ -82,10 +87,9 @@ export default function Sosyal() {
         const data = docSnap.data();
         if (docSnap.id === userId) return;
         
-        const emailMatch = data.email && data.email.toLowerCase().includes(searchLower);
         const nameMatch = data.isim && data.isim.toLowerCase().includes(searchLower);
         
-        if (emailMatch || nameMatch) {
+        if (nameMatch) {
           sonuclar.push({ id: docSnap.id, ...data });
         }
       });
@@ -121,13 +125,11 @@ export default function Sosyal() {
 
   const istekKabulEt = async (reqId, fromId) => {
     try {
-      await updateDoc(doc(db, 'profiles', userId), {
-        friends: arrayUnion(fromId)
-      });
-      await updateDoc(doc(db, 'profiles', fromId), {
-        friends: arrayUnion(userId)
-      });
-      await deleteDoc(doc(db, 'friend_requests', reqId));
+      const batch = writeBatch(db);
+      batch.update(doc(db, 'profiles', userId), { friends: arrayUnion(fromId) });
+      batch.update(doc(db, 'profiles', fromId), { friends: arrayUnion(userId) });
+      batch.delete(doc(db, 'friend_requests', reqId));
+      await batch.commit();
       istekleriGetir();
       arkadaslariGetir();
     } catch (e) {
@@ -167,7 +169,7 @@ export default function Sosyal() {
             <form onSubmit={arkadasAra} className="flex gap-2 mb-4">
               <input 
                 type="text" 
-                placeholder="Arkadaşının adı veya e-posta adresi..." 
+                placeholder="Arkadaşının görünen adı..."
                 value={aramaMetni}
                 onChange={e => setAramaMetni(e.target.value)}
                 className="flex-1 px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-blue-500"

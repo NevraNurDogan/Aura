@@ -4,7 +4,7 @@ import { BarChart, Bar, LineChart, Line, XAxis, Tooltip, ResponsiveContainer, Ca
 import confetti from 'canvas-confetti';
 import { collection, query, where, getDocs, setDoc, doc, getDoc } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
-import { db, auth, getCurrentUserId } from '../firebase';
+import { db, auth, getCurrentUserId, updatePublicProfile } from '../firebase';
 
 export default function Profil() {
   const varsayilanIsim = auth.currentUser?.displayName || (auth.currentUser?.email ? auth.currentUser.email.split('@')[0] : 'Kullanıcı');
@@ -310,7 +310,10 @@ export default function Profil() {
     window.dispatchEvent(new Event('profilGuncellendi'));
 
     try {
-      await setDoc(doc(db, 'profiles', userId), profilData, { merge: true });
+      await Promise.all([
+        setDoc(doc(db, 'profiles', userId), profilData, { merge: true }),
+        updatePublicProfile(userId, profilData)
+      ]);
     } catch (e) { console.warn("Profil Firebase'e kaydedilemedi."); }
   };
 
@@ -340,7 +343,10 @@ export default function Profil() {
     window.dispatchEvent(new Event('profilGuncellendi'));
 
     try {
-      await setDoc(doc(db, 'profiles', userId), payload, { merge: true });
+      await Promise.all([
+        setDoc(doc(db, 'profiles', userId), payload, { merge: true }),
+        updatePublicProfile(userId, payload)
+      ]);
     } catch (error) {
       console.warn("Profil Firebase'e güncellenemedi.");
     }
